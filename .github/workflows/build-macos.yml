@@ -12,18 +12,25 @@ jobs:
     strategy:
       matrix:
         include:
-          # ARM64 builds
+          # ARM64 builds on macOS 14 Sonoma
+          - runner: macos-14
+            arch: arm64
+            type: dynamic
+          - runner: macos-14
+            arch: arm64
+            type: static
+          # ARM64 builds on macOS 15 Sequoia
           - runner: macos-15
             arch: arm64
             type: dynamic
           - runner: macos-15
             arch: arm64
             type: static
-          # Intel x86_64 builds
-          - runner: macos-14-large
+          # Intel x86_64 builds on macOS 15
+          - runner: macos-15-intel
             arch: x86_64
             type: dynamic
-          - runner: macos-14-large
+          - runner: macos-15-intel
             arch: x86_64
             type: static
     
@@ -110,7 +117,7 @@ jobs:
     needs: build
     strategy:
       matrix:
-        runner: [ macos-15, macos-14-large ]
+        runner: [ macos-14, macos-15, macos-15-intel ]
     
     runs-on: ${{ matrix.runner }}
 

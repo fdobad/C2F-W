@@ -75,46 +75,43 @@ jobs:
           find artifacts -name 'WINDOWS_BUILD_WAS_DISABLED.txt' -type f -exec cp {} Cell2Fire/ \; 2>/dev/null || true
           ls -lh Cell2Fire/
 
-      - name: Create Binary Zips - Debian
+      - name: Create Binary Zips - Debian distros
         run: |
           cd Cell2Fire
-          
-          # Debian bookworm
-          if [[ -f Cell2Fire.Debian.bookworm.x86_64 ]]; then
-            zip ../Cell2FireW_${RELEASE_TAG}-Debian.bookworm.x86_64-binary.zip \
-              Cell2Fire.Debian.bookworm.x86_64 \
-              ldd.Debian.bookworm.x86_64.txt
-          fi
-          
-          # Debian trixie
-          if [[ -f Cell2Fire.Debian.trixie.x86_64 ]]; then
-            zip ../Cell2FireW_${RELEASE_TAG}-Debian.trixie.x86_64-binary.zip \
-              Cell2Fire.Debian.trixie.x86_64 \
-              ldd.Debian.trixie.x86_64.txt
-          fi
-          
-          # Ubuntu noble
-          if [[ -f Cell2Fire.Ubuntu.noble.x86_64 ]]; then
-            zip ../Cell2FireW_${RELEASE_TAG}-Ubuntu.noble.x86_64-binary.zip \
-              Cell2Fire.Ubuntu.noble.x86_64 \
-              ldd.Ubuntu.noble.x86_64.txt
-          fi
 
+          for distro in "Debian.bookworm.x86_64" "Debian.trixie.x86_64" "Ubuntu.noble.x86_64" "Ubuntu.jammy.x86_64"; do
+            if [[ -f "Cell2Fire.${distro}" ]]; then
+              zip ../Cell2FireW_${RELEASE_TAG}-${distro}-binary.zip \
+                "Cell2Fire.${distro}" \
+                "ldd.${distro}.txt" \
+                "pkgs.${distro}.txt" 
+            else
+              echo "No build found for ${distro}, skipping zip creation."
+            fi
+          done
+          
       - name: Create Binary Zips - ManyLinux
         run: |
           cd Cell2Fire
-          if [[ -f Cell2Fire ]] && [[ ! -f Cell2Fire.exe ]]; then
+          if [[ -f Cell2Fire ]]; then
             zip ../Cell2FireW_${RELEASE_TAG}-manylinux-x86_64-binary.zip \
               Cell2Fire \
               ldd_manylinux.txt
+              pkgs_manylinux.txt
+          else
+            echo "No manylinux build found, skipping zip creation."
           fi
 
       - name: Create Binary Zips - macOS
         run: |
           cd Cell2Fire
-          zip ../Cell2FireW_${RELEASE_TAG}-macOS-binaries.zip \
-            Cell2Fire_Darwin* \
-            otool*.txt 2>/dev/null || echo "No macOS binaries found"
+          if [[ -f Cell2Fire_Darwin ]]; then
+            zip ../Cell2FireW_${RELEASE_TAG}-macOS-binaries.zip \
+              Cell2Fire_Darwin* \
+              otool*.txt
+          else
+            echo "No macOS binaries found, skipping zip creation."
+          fi
 
       - name: Create Binary Zips - Windows
         run: |
@@ -123,6 +120,7 @@ jobs:
             zip ../Cell2FireW_${RELEASE_TAG}-Windows-x86_64-binary.zip \
               Cell2Fire.exe *.dll
           else
+            echo "No Windows build found, creating placeholder zip."
             zip ../Cell2FireW_${RELEASE_TAG}-Windows-x86_64-binary.zip \
               WINDOWS_BUILD_WAS_DISABLED.txt
           fi

@@ -90,8 +90,41 @@ jobs:
       - name: Download Dependencies
         if: env.ENABLED == 'true' && (steps.cache-vcpkg.outputs.cache-hit != 'true' || steps.cache-boost.outputs.cache-hit != 'true' || steps.cache-dirent.outputs.cache-hit != 'true')
         shell: pwsh
+        env:
+          CACHE_BOOST: ${{ steps.cache-boost.outputs.cache-hit }}
+          CACHE_DIRENT: ${{ steps.cache-dirent.outputs.cache-hit }}
+          CACHE_VCPKG: ${{ steps.cache-vcpkg.outputs.cache-hit }}
         run: |
           Write-Host "Downloading Windows dependencies..."
+          cd Cell2Fire
+          New-Item -ItemType Directory -Path "include" -Force
+
+          Write-Host "Cache Boost: $CACHE_BOOST $($CACHE_BOOST -ne 'true')"
+          Write-Host "Cache Boost: $CACHE_VCPKG $($CACHE_VCPKG -ne 'true')"
+
+          # boost
+          if ($CACHE_BOOST -ne 'true') {
+            $fname = "boost_1_84_0.tar.gz"
+            Invoke-WebRequest -Uri https://archives.boost.io/release/1.84.0/source/$fname -OutFile $fname
+            tar -xzf $fname -C include
+          } else {
+            echo "Boost already cached"
+          }
+
+          # dirent
+          if ($CACHE_DIRENT -ne 'true') {
+            Invoke-WebRequest -Uri https://github.com/tronkko/dirent/archive/refs/tags/1.25.zip -OutFile dirent-1.25.zip
+            Expand-Archive -Path .\dirent-1.25.zip -DestinationPath include
+          } else {
+            echo "Dirent already cached"
+          }
+
+          # tiffio
+          if ($CACHE_VCPKG -ne 'true') {
+            git clone https://github.com/microsoft/vcpkg.git include\vcpkg
+          } else {
+            echo "vcpkg already cached"
+          }
           # Add your dependency download script here
           # This should download Boost, Dirent, and setup vcpkg
 
