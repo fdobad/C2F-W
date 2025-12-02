@@ -1,4 +1,4 @@
-name: mt19937 cross-os congruence (boost)
+name: mt19937 cross-os (vendored boost)
 
 on:
   workflow_dispatch:
@@ -13,41 +13,60 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup MSBuild (Windows)
-        if: startsWith(matrix.os, 'windows')
-        uses: microsoft/setup-msbuild@v2
+      - name: Create vendor dirs
+        run: |
+          mkdir -p third_party/boost/include/boost/random
+        shell: bash
 
-      - name: Ensure compiler + boost (Ubuntu)
+      - name: Fetch headers (Linux/macOS)
+        if: startsWith(matrix.os, 'ubuntu') || startsWith(matrix.os, 'macos')
+        run: |
+          base=https://raw.githubusercontent.com/boostorg/random/master/include/boost/random
+          curl -fsSL $base/mersenne_twister.hpp -o third_party/boost/include/boost/random/mersenne_twister.hpp
+          curl -fsSL $base/uniform_int_distribution.hpp -o third_party/boost/include/boost/random/uniform_int_distribution.hpp
+          curl -fsSL $base/normal_distribution.hpp -o third_party/boost/include/boost/random/normal_distribution.hpp
+          curl -fsSL https://raw.githubusercontent.com/boostorg/random/master/include/boost/random.hpp -o third_party/boost/include/boost/random.hpp
+        shell: bash
+
+      - name: Fetch headers (Windows)
+        if: startsWith(matrix.os, 'windows')
+        run: |
+          $base = "https://raw.githubusercontent.com/boostorg/random/master/include/boost/random"
+          Invoke-WebRequest -Uri "$base/mersenne_twister.hpp" -OutFile "third_party/boost/include/boost/random/mersenne_twister.hpp"
+          Invoke-WebRequest -Uri "$base/uniform_int_distribution.hpp" -OutFile "third_party/boost/include/boost/random/uniform_int_distribution.hpp"
+          Invoke-WebRequest -Uri "$base/normal_distribution.hpp" -OutFile "third_party/boost/include/boost/random/normal_distribution.hpp"
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/boostorg/random/master/include/boost/random.hpp" -OutFile "third_party/boost/include/boost/random.hpp"
+        shell: pwsh
+
+      - name: Ensure compiler (Ubuntu)
         if: startsWith(matrix.os, 'ubuntu')
         run: |
           sudo apt-get update -y;
-          sudo apt-get install -y build-essential libboost-all-dev
+          sudo apt-get install -y build-essential
         shell: bash
 
-      - name: Ensure compiler + boost (macOS)
+      - name: Ensure compiler (macOS)
         if: startsWith(matrix.os, 'macos')
         run: |
-          xcode-select --install || true;
-          brew update || true;
-          brew install boost || true
+          xcode-select --install || true
         shell: bash
 
       - name: Build (Linux/macOS)
         if: startsWith(matrix.os, 'ubuntu') || startsWith(matrix.os, 'macos')
         run: |
-          c++ -std=c++17 test/tech/mt19937_emit_boost.cpp -o mt19937_emit_boost
+          c++ -std=c++17 -I third_party/boost/include test/tech/mt19937_emit_boost.cpp -o mt19937_emit_boost
         shell: bash
 
       - name: Set up Visual Studio shell
         if: startsWith(matrix.os, 'windows')
         uses: egor-tensin/vs-shell@v2
         with:
-            arch: x64
+          arch: x64
 
-      - name: Build Boost (Windows)
+      - name: Build (Windows)
         if: startsWith(matrix.os, 'windows')
         run: |
-          cl /std:c++17 test\tech\mt19937_emit_boost.cpp /Fe:mt19937_emit_boost.exe
+          cl /std:c++17 /I third_party\boost\include test\tech\mt19937_emit_boost.cpp /Fe:mt19937_emit_boost.exe
         shell: pwsh
 
       - name: Run and capture (Linux/macOS)
