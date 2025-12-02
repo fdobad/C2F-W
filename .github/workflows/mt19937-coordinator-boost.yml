@@ -32,19 +32,21 @@ jobs:
           echo "Using clang++ from Homebrew"
           echo "CXX=$(brew --prefix)/opt/llvm/bin/clang++" >> $GITHUB_ENV
 
-      - name: Setup MSVC + vcpkg (Windows)
+      - name: Set up Visual Studio shell (Windows)
+        if: startsWith(matrix.os, 'windows')
+        uses: egor-tensin/vs-shell@v2
+        with:
+            arch: x64
+
+      - name: vcpkg (Windows)
         if: startsWith(matrix.os, 'windows')
         shell: powershell
         run: |
-          # Initialize MSVC developer environment
-          $vsDevCmd = "$env:ProgramFiles\Microsoft Visual Studio\2022\BuildTools\Common7\Tools\VsDevCmd.bat"
-          if (-Not (Test-Path $vsDevCmd)) { $vsDevCmd = "$env:ProgramFiles\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat" }
-          cmd /c "`"$vsDevCmd`" -arch=x64 -host_arch=x64 & where cl"
           # Use preinstalled vcpkg from runner images
-          $env:VCPKG_ROOT = $env:VCPKG_INSTALLATION_ROOT  # Expected: C:\vcpkg
-          & "$env:VCPKG_ROOT\vcpkg.exe" install boost-random:x64-windows
-          Write-Host "VCPKG include: $env:VCPKG_ROOT\installed\x64-windows\include"
-          "$env:VCPKG_ROOT\installed\x64-windows\include" | Out-File -FilePath include_path.txt -Encoding ascii
+          $env:VCPKG = $env:VCPKG_INSTALLATION_ROOT  # Expected: C:\vcpkg
+          & "$env:VCPKG\vcpkg.exe" install boost-random:x64-windows
+          Write-Host "VCPKG include: $env:VCPKG\installed\x64-windows\include"
+          "$env:VCPKG\installed\x64-windows\include" | Out-File -FilePath include_path.txt -Encoding ascii
 
       - name: Build (Ubuntu)
         if: startsWith(matrix.os, 'ubuntu')
