@@ -93,12 +93,10 @@ jobs:
 
       - name: Diff Ubuntu vs macOS
         run: |
-          dos2unix artifacts/boost-emit-ubuntu-latest/boost_emit_ubuntu-latest.txt || true
-          dos2unix artifacts/boost-emit-macos-latest/boost_emit_macos-latest.txt || true
           diff -u artifacts/boost-emit-ubuntu-latest/boost_emit_ubuntu-latest.txt artifacts/boost-emit-macos-latest/boost_emit_macos-latest.txt || (echo "Differences found between Ubuntu and macOS" && exit 1)
 
       - name: Diff Ubuntu vs Windows (normalize CRLF)
         run: |
-          dos2unix artifacts/boost-emit-ubuntu-latest/boost_emit_ubuntu-latest.txt || true
-          dos2unix artifacts/boost-emit-windows-latest/boost_emit_windows-latest.txt || true
+          sudo apt-get install -y dos2unix
+          dos2unix artifacts/boost-emit-windows-latest/boost_emit_windows-latest.txt
           diff -u artifacts/boost-emit-ubuntu-latest/boost_emit_ubuntu-latest.txt artifacts/boost-emit-windows-latest/boost_emit_windows-latest.txt || (echo "Differences found between Ubuntu and Windows" && exit 1)
