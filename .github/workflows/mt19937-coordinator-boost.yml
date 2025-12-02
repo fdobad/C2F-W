@@ -38,15 +38,14 @@ jobs:
         with:
             arch: x64
 
-      - name: vcpkg (Windows)
+      - name: Set up Vcpkg (Windows)
         if: startsWith(matrix.os, 'windows')
         shell: powershell
         run: |
           # Use preinstalled vcpkg from runner images
-          $env:VCPKG_ROOT = $env:VCPKG_INSTALLATION_ROOT  # Expected: C:\vcpkg
-          & "$env:VCPKG_ROOT\vcpkg.exe" install boost-random:x64-windows
-          Write-Host "VCPKG include: $env:VCPKG_ROOT\installed\x64-windows\include"
-          "$env:VCPKG_ROOT\installed\x64-windows\include" | Out-File -FilePath include_path.txt -Encoding ascii
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install boost-random:x64-windows
+          Write-Host "VCPKG include: $env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\include"
+          "$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\include" | Out-File -FilePath include_path.txt -Encoding ascii
 
       - name: Build (Ubuntu)
         if: startsWith(matrix.os, 'ubuntu')
@@ -60,10 +59,12 @@ jobs:
 
       - name: Build (Windows)
         if: startsWith(matrix.os, 'windows')
-        shell: cmd
+        shell: powershell
         run: |
-          set INCLUDE=%VCPKG_ROOT%\installed\x64-windows\include;%INCLUDE%
-          cl /std:c++17 /EHsc /I "%VCPKG_ROOT%\installed\x64-windows\include" test\tech\mt19937_emit_boost.cpp /Fe:mt19937_emit_boost.exe
+            # Add include path and compile
+            $include = Join-Path $env:VCPKG_INSTALLATION_ROOT 'installed\x64-windows\include'
+            $env:INCLUDE = "$include;$env:INCLUDE"
+            cmd /c "cl /std:c++17 /EHsc /I `"$include`" test\tech\mt19937_emit_boost.cpp /Fe:mt19937_emit_boost.exe"
 
       - name: Run emitter
         shell: bash
@@ -73,7 +74,6 @@ jobs:
           else
             ./mt19937_emit_boost > boost_emit_${{ matrix.os }}.txt
           fi
-        # no env needed
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
