@@ -1,0 +1,91 @@
+name: mt19937 cross-os congruence (boost)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  emit:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild (Windows)
+        if: startsWith(matrix.os, 'windows')
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Ensure compiler + boost (Ubuntu)
+        if: startsWith(matrix.os, 'ubuntu')
+        run: |
+          sudo apt-get update -y;
+          sudo apt-get install -y build-essential libboost-all-dev
+        shell: bash
+
+      - name: Ensure compiler + boost (macOS)
+        if: startsWith(matrix.os, 'macos')
+        run: |
+          xcode-select --install || true;
+          brew update || true;
+          brew install boost || true
+        shell: bash
+
+      - name: Build (Linux/macOS)
+        if: startsWith(matrix.os, 'ubuntu') || startsWith(matrix.os, 'macos')
+        run: |
+          c++ -std=c++17 test/tech/mt19937_emit_boost.cpp -o mt19937_emit_boost
+        shell: bash
+
+      - name: Set up Visual Studio shell
+        if: startsWith(matrix.os, 'windows')
+        uses: egor-tensin/vs-shell@v2
+        with:
+            arch: x64
+
+      - name: Build Boost (Windows)
+        if: startsWith(matrix.os, 'windows')
+        run: |
+          cl /std:c++17 test\tech\mt19937_emit_boost.cpp /Fe:mt19937_emit_boost.exe
+        shell: pwsh
+
+      - name: Run and capture (Linux/macOS)
+        if: startsWith(matrix.os, 'ubuntu') || startsWith(matrix.os, 'macos')
+        run: |
+          ./mt19937_emit_boost > mt19937_boost_${{ runner.os }}.txt
+        shell: bash
+
+      - name: Run and capture (Windows)
+        if: startsWith(matrix.os, 'windows')
+        run: |
+          .\mt19937_emit_boost.exe | Out-File -FilePath mt19937_boost_${{ runner.os }}.txt -Encoding ascii
+        shell: pwsh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mt19937-boost-${{ matrix.os }}
+          path: mt19937_boost_${{ runner.os }}.txt
+
+  compare:
+    runs-on: ubuntu-latest
+    needs: emit
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List files
+        run: |
+          find artifacts -type f -maxdepth 2 -print
+
+      - name: Compare Ubuntu vs macOS
+        run: |
+          diff -u artifacts/mt19937-boost-ubuntu-latest/mt19937_boost_Linux.txt artifacts/mt19937-boost-macos-latest/mt19937_boost_macOS.txt
+
+      - name: Compare Ubuntu vs Windows
+        run: |
+          dos2unix artifacts/mt19937-boost-windows-latest/mt19937_boost_Windows.txt;
+          diff -u artifacts/mt19937-boost-ubuntu-latest/mt19937_boost_Linux.txt artifacts/mt19937-boost-windows-latest/mt19937_boost_Windows.txt
