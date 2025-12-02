@@ -1,14 +1,14 @@
 name: Build Windows
-
 on:
-  workflow_dispatch:
-  workflow_call:
-
+  workflow_dispatch: {}
+  workflow_call: {}
 permissions:
   contents: write
+env:
+  ACT: ''
 
 jobs:
-  build:
+  windows_build:
     runs-on: windows-latest
     defaults:
       run:
@@ -18,78 +18,76 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v5
 
-    - name: Bump version in header (Windows)
-      run: |
-        $version = "dev"
-        if ( "${{ github.event_name }}" -eq "pull_request" ){
-          $version="${{ github.sha }}"
-        }
-        if ("${{ github.event_name }}" -eq "workflow_dispatch" ){
-          $version="${{ github.sha }}"
-        } 
-        if ( ("${{github.event_name}}" -eq "push") -and ("${{github.ref_type}}" -eq "tag" )){
-          $ref="${{ github.ref }}"
-          $version=$ref.Split("/")[-1]
-        }
-        
-        Write-Host "Setting version to $version"
-        
-        $path = "Cell2Fire\Cell2Fire.h"
-        (Get-Content $path) -replace 'C2FW_VERSION\s*=\s*".*?"', "C2FW_VERSION = `"$version`"" | Set-Content $path
-        
-        Select-String 'C2FW_VERSION' $path
+      - name: Bump version in header (Windows)
+        run: |
+          $version = "dev"
+          if ( "${{ github.event_name }}" -eq "pull_request" ){
+            $version="${{ github.sha }}"
+          }
+          if ("${{ github.event_name }}" -eq "workflow_dispatch" ){
+            $version="${{ github.sha }}"
+          } 
+          if ( ("${{github.event_name}}" -eq "push") -and ("${{github.ref_type}}" -eq "tag" )){
+            $ref="${{ github.ref }}"
+            $version=$ref.Split("/")[-1]
+          }
+          
+          Write-Host "Setting version to $version"
+          
+          $path = "Cell2Fire\Cell2Fire.h"
+          (Get-Content $path) -replace 'C2FW_VERSION\s*=\s*".*?"', "C2FW_VERSION = `"$version`"" | Set-Content $path
+          
+          Select-String 'C2FW_VERSION' $path
 
-    - name: Setup vcpkg (manifest mode)
-      run: |
-        Write-Host "$env:GITHUB_WORKSPACE"
-        ls $env:GITHUB_WORKSPACE\build\windows
-        New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE\binaries" | Out-Null
-        & "$env:GITHUB_WORKSPACE\build\windows\setup-vcpkg.ps1" -Root "$env:GITHUB_WORKSPACE"
+      - name: Setup vcpkg (manifest mode)
+        run: |
+          New-Item -ItemType Directory -Force -Path "binaries" | Out-Null
+          & build\windows\setup-vcpkg.ps1
 
-    - name: Setup MSBuild (GitHub-hosted)
-      if: env.ACT != 'true'
-      uses: microsoft/setup-msbuild@v2
+      - name: Setup MSBuild (GitHub-hosted)
+        if: env.ACT != 'true'
+        uses: microsoft/setup-msbuild@v2
 
-    - name: Download vswhere (local act)
-      if: env.ACT == 'true'
-      run: |
-        New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE\tools\vswhere" | Out-Null
-        $vswherePath = "$env:GITHUB_WORKSPACE\tools\vswhere\vswhere.exe"
-        if (-not (Test-Path $vswherePath)) {
-          Invoke-WebRequest -Uri "https://github.com/microsoft/vswhere/releases/latest/download/vswhere.exe" -OutFile $vswherePath
-        }
-        Write-Host "vswhere located at: $vswherePath"
+      - name: Download vswhere (local act)
+        if: env.ACT == 'true'
+        run: |
+          New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE\tools\vswhere" | Out-Null
+          $vswherePath = "$env:GITHUB_WORKSPACE\tools\vswhere\vswhere.exe"
+          if (-not (Test-Path $vswherePath)) {
+            Invoke-WebRequest -Uri "https://github.com/microsoft/vswhere/releases/latest/download/vswhere.exe" -OutFile $vswherePath
+          }
+          Write-Host "vswhere located at: $vswherePath"
 
-    - name: Configure MSBuild (local act)
-      if: env.ACT == 'true'
-      uses: microsoft/setup-msbuild@v2
-      with:
-        vswhere-path: tools\vswhere
+      - name: Configure MSBuild (local act)
+        if: env.ACT == 'true'
+        uses: microsoft/setup-msbuild@v2
+        with:
+          vswhere-path: tools\vswhere
 
-    - name: Build Solution
-      run: |
-        cd "$env:GITHUB_WORKSPACE\Cell2Fire"
-        msbuild Cell2Fire.sln /p:Configuration=Release /p:VcpkgEnableManifest=true
+      - name: Build Solution
+        run: |
+          cd "$env:GITHUB_WORKSPACE\Cell2Fire"
+          msbuild Cell2Fire.sln /p:Configuration=Release /p:VcpkgEnableManifest=true
 
-    - name: Run Unit Tests
-      run: |
-        & "Cell2Fire\x64\Release\WindowsTests.exe"
-        $exitCode = $LASTEXITCODE
-        exit $exitCode
+      - name: Run Unit Tests
+        run: |
+          & "Cell2Fire\x64\Release\WindowsTests.exe"
+          $exitCode = $LASTEXITCODE
+          exit $exitCode
 
-    - name: Run Regression Test
-      run: |
-        cd test
-        ./test.ps1
+      - name: Run Regression Test
+        run: |
+          cd test
+          ./test.ps1
 
-    - name: Gather output
-      run: |
-        mkdir binaries
-        copy Cell2Fire\x64\Release\*.dll binaries
-        copy Cell2Fire\x64\Release\Cell2Fire.exe binaries
+      - name: Gather output
+        run: |
+          mkdir binaries
+          copy Cell2Fire\x64\Release\*.dll binaries
+          copy Cell2Fire\x64\Release\Cell2Fire.exe binaries
 
-    - name: Upload artifact (real or placeholder)
-      uses: actions/upload-artifact@v5
-      with:
-        name: binaries-Windows-x86_64
-        path: binaries
+      - name: Upload artifact (real or placeholder)
+        uses: actions/upload-artifact@v5
+        with:
+          name: binaries-Windows-x86_64
+          path: binaries
