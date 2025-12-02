@@ -1,0 +1,15 @@
+{
+  "name": "cell2fire",
+  "version-string": "dev",
+  "builtin-baseline": "PLACEHOLDER_BASELINE",
+  "dependencies": [
+    "boost",
+    "dirent",
+    "tiff",
+    "catch2"
+  ],
+  "overrides": [
+    { "name": "boost", "version": "1.84.0" },
+    { "name": "dirent", "version": "1.25" }
+  ]
+}
