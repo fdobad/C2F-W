@@ -36,6 +36,12 @@ jobs:
           c++ -std=c++17 test/tech/mt19937_emit.cpp -o mt19937_emit
         shell: bash
 
+      - name: Set up Visual Studio shell
+        if: startsWith(matrix.os, 'windows')
+        uses: egor-tensin/vs-shell@v2
+        with:
+            arch: x64
+
       - name: Build (Windows)
         if: startsWith(matrix.os, 'windows')
         run: |
