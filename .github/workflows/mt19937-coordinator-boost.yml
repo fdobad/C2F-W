@@ -43,10 +43,10 @@ jobs:
         shell: powershell
         run: |
           # Use preinstalled vcpkg from runner images
-          $env:VCPKG = $env:VCPKG_INSTALLATION_ROOT  # Expected: C:\vcpkg
-          & "$env:VCPKG\vcpkg.exe" install boost-random:x64-windows
-          Write-Host "VCPKG include: $env:VCPKG\installed\x64-windows\include"
-          "$env:VCPKG\installed\x64-windows\include" | Out-File -FilePath include_path.txt -Encoding ascii
+          $env:VCPKG_ROOT = $env:VCPKG_INSTALLATION_ROOT  # Expected: C:\vcpkg
+          & "$env:VCPKG_ROOT\vcpkg.exe" install boost-random:x64-windows
+          Write-Host "VCPKG include: $env:VCPKG_ROOT\installed\x64-windows\include"
+          "$env:VCPKG_ROOT\installed\x64-windows\include" | Out-File -FilePath include_path.txt -Encoding ascii
 
       - name: Build (Ubuntu)
         if: startsWith(matrix.os, 'ubuntu')
