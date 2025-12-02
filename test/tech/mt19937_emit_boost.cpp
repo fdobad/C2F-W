@@ -16,6 +16,7 @@ int main()
         std::cout << udist(eng) << '\n';
     }
 
+    // Reset engine for normal distribution to ensure same sequence base
     eng.seed(seed);
     std::cout << "# boost::mt19937 normal mean=0 stddev=1" << std::endl;
     std::cout << std::setprecision(17);

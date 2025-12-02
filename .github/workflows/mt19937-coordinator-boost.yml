@@ -1,110 +1,102 @@
-name: mt19937 cross-os (vendored boost)
-
+name: Boost mt19937 cross-OS coordinator
 on:
   workflow_dispatch:
-
 jobs:
-  emit:
+  build-and-run:
+    name: Build and run Boost emitter (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+    # no job-level env needed
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Create vendor dirs
-        run: |
-          mkdir -p third_party/boost/include/boost/random
-        shell: bash
-
-      - name: Fetch headers (Linux/macOS)
-        if: startsWith(matrix.os, 'ubuntu') || startsWith(matrix.os, 'macos')
-        run: |
-          base=https://raw.githubusercontent.com/boostorg/random/master/include/boost/random
-          curl -fsSL $base/mersenne_twister.hpp -o third_party/boost/include/boost/random/mersenne_twister.hpp
-          curl -fsSL $base/uniform_int_distribution.hpp -o third_party/boost/include/boost/random/uniform_int_distribution.hpp
-          curl -fsSL $base/normal_distribution.hpp -o third_party/boost/include/boost/random/normal_distribution.hpp
-          curl -fsSL https://raw.githubusercontent.com/boostorg/random/master/include/boost/random.hpp -o third_party/boost/include/boost/random.hpp
-        shell: bash
-
-      - name: Fetch headers (Windows)
-        if: startsWith(matrix.os, 'windows')
-        run: |
-          $base = "https://raw.githubusercontent.com/boostorg/random/master/include/boost/random"
-          Invoke-WebRequest -Uri "$base/mersenne_twister.hpp" -OutFile "third_party/boost/include/boost/random/mersenne_twister.hpp"
-          Invoke-WebRequest -Uri "$base/uniform_int_distribution.hpp" -OutFile "third_party/boost/include/boost/random/uniform_int_distribution.hpp"
-          Invoke-WebRequest -Uri "$base/normal_distribution.hpp" -OutFile "third_party/boost/include/boost/random/normal_distribution.hpp"
-          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/boostorg/random/master/include/boost/random.hpp" -OutFile "third_party/boost/include/boost/random.hpp"
-        shell: pwsh
-
-      - name: Ensure compiler (Ubuntu)
+      - name: Install dependencies (Ubuntu)
         if: startsWith(matrix.os, 'ubuntu')
         run: |
-          sudo apt-get update -y;
-          sudo apt-get install -y build-essential
-        shell: bash
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang
+          # Install Boost.Random only
+          sudo apt-get install -y libboost-random-dev
 
-      - name: Ensure compiler (macOS)
+      - name: Install dependencies (macOS)
         if: startsWith(matrix.os, 'macos')
         run: |
-          xcode-select --install || true
-        shell: bash
+          brew update
+          brew install llvm
+          # Homebrew provides Boost as a single formula; we'll use headers/libs from it
+          brew install boost
+          echo "Using clang++ from Homebrew"
+          echo "CXX=$(brew --prefix)/opt/llvm/bin/clang++" >> $GITHUB_ENV
 
-      - name: Build (Linux/macOS)
-        if: startsWith(matrix.os, 'ubuntu') || startsWith(matrix.os, 'macos')
-        run: |
-          c++ -std=c++17 -I third_party/boost/include test/tech/mt19937_emit_boost.cpp -o mt19937_emit_boost
-        shell: bash
-
-      - name: Set up Visual Studio shell
+      - name: Setup MSVC + vcpkg (Windows)
         if: startsWith(matrix.os, 'windows')
-        uses: egor-tensin/vs-shell@v2
-        with:
-          arch: x64
+        shell: powershell
+        run: |
+          # Initialize MSVC developer environment
+          $vsDevCmd = "$env:ProgramFiles\Microsoft Visual Studio\2022\BuildTools\Common7\Tools\VsDevCmd.bat"
+          if (-Not (Test-Path $vsDevCmd)) { $vsDevCmd = "$env:ProgramFiles\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat" }
+          cmd /c "`"$vsDevCmd`" -arch=x64 -host_arch=x64 & where cl"
+          # Use preinstalled vcpkg from runner images
+          $env:VCPKG_ROOT = $env:VCPKG_INSTALLATION_ROOT  # Expected: C:\vcpkg
+          & "$env:VCPKG_ROOT\vcpkg.exe" install boost-random:x64-windows
+          Write-Host "VCPKG include: $env:VCPKG_ROOT\installed\x64-windows\include"
+          "$env:VCPKG_ROOT\installed\x64-windows\include" | Out-File -FilePath include_path.txt -Encoding ascii
+
+      - name: Build (Ubuntu)
+        if: startsWith(matrix.os, 'ubuntu')
+        run: |
+          c++ -std=c++17 test/tech/mt19937_emit_boost.cpp -o mt19937_emit_boost
+
+      - name: Build (macOS)
+        if: startsWith(matrix.os, 'macos')
+        run: |
+          "$CXX" -std=c++17 -I"$(brew --prefix)/include" -L"$(brew --prefix)/lib" test/tech/mt19937_emit_boost.cpp -o mt19937_emit_boost
 
       - name: Build (Windows)
         if: startsWith(matrix.os, 'windows')
+        shell: cmd
         run: |
-          cl /std:c++17 /I third_party\boost\include test\tech\mt19937_emit_boost.cpp /Fe:mt19937_emit_boost.exe
-        shell: pwsh
+          set INCLUDE=%VCPKG_ROOT%\installed\x64-windows\include;%INCLUDE%
+          cl /std:c++17 /EHsc /I "%VCPKG_ROOT%\installed\x64-windows\include" test\tech\mt19937_emit_boost.cpp /Fe:mt19937_emit_boost.exe
 
-      - name: Run and capture (Linux/macOS)
-        if: startsWith(matrix.os, 'ubuntu') || startsWith(matrix.os, 'macos')
-        run: |
-          ./mt19937_emit_boost > mt19937_boost_${{ runner.os }}.txt
+      - name: Run emitter
         shell: bash
-
-      - name: Run and capture (Windows)
-        if: startsWith(matrix.os, 'windows')
         run: |
-          .\mt19937_emit_boost.exe | Out-File -FilePath mt19937_boost_${{ runner.os }}.txt -Encoding ascii
-        shell: pwsh
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            ./mt19937_emit_boost.exe > boost_emit_${{ matrix.os }}.txt
+          else
+            ./mt19937_emit_boost > boost_emit_${{ matrix.os }}.txt
+          fi
+        # no env needed
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: mt19937-boost-${{ matrix.os }}
-          path: mt19937_boost_${{ runner.os }}.txt
+          name: boost-emit-${{ matrix.os }}
+          path: boost_emit_${{ matrix.os }}.txt
 
-  compare:
+  compare-outputs:
+    name: Compare outputs
     runs-on: ubuntu-latest
-    needs: emit
+    needs: build-and-run
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-      - name: List files
+      - name: Diff Ubuntu vs macOS
         run: |
-          find artifacts -type f -maxdepth 2 -print
+          dos2unix artifacts/boost-emit-ubuntu-latest/boost_emit_ubuntu-latest.txt || true
+          dos2unix artifacts/boost-emit-macos-latest/boost_emit_macos-latest.txt || true
+          diff -u artifacts/boost-emit-ubuntu-latest/boost_emit_ubuntu-latest.txt artifacts/boost-emit-macos-latest/boost_emit_macos-latest.txt || (echo "Differences found between Ubuntu and macOS" && exit 1)
 
-      - name: Compare Ubuntu vs macOS
+      - name: Diff Ubuntu vs Windows (normalize CRLF)
         run: |
-          diff -u artifacts/mt19937-boost-ubuntu-latest/mt19937_boost_Linux.txt artifacts/mt19937-boost-macos-latest/mt19937_boost_macOS.txt
-
-      - name: Compare Ubuntu vs Windows
-        run: |
-          dos2unix artifacts/mt19937-boost-windows-latest/mt19937_boost_Windows.txt;
-          diff -u artifacts/mt19937-boost-ubuntu-latest/mt19937_boost_Linux.txt artifacts/mt19937-boost-windows-latest/mt19937_boost_Windows.txt
+          dos2unix artifacts/boost-emit-ubuntu-latest/boost_emit_ubuntu-latest.txt || true
+          dos2unix artifacts/boost-emit-windows-latest/boost_emit_windows-latest.txt || true
+          diff -u artifacts/boost-emit-ubuntu-latest/boost_emit_ubuntu-latest.txt artifacts/boost-emit-windows-latest/boost_emit_windows-latest.txt || (echo "Differences found between Ubuntu and Windows" && exit 1)
