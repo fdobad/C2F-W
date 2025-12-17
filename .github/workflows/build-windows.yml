@@ -52,6 +52,7 @@ jobs:
             vcpkg-x64-windows-
 
       - name: Show vcpkg paths (pre-build)
+        if: ${{ true }}
         run: |
           cd Cell2Fire
           $archives = Join-Path $env:LOCALAPPDATA "vcpkg\archives"
@@ -98,6 +99,7 @@ jobs:
           msbuild Cell2Fire.sln /m /t:Clean,Build /p:Configuration=Release /p:Platform=x64 /p:VcpkgEnableManifest=true
 
       - name: Show vcpkg paths (post-build)
+        if: ${{ false }}
         run: |
           cd Cell2Fire
           $archives = Join-Path $env:LOCALAPPDATA "vcpkg\archives"
