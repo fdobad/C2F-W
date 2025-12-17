@@ -1,0 +1,53 @@
+name: Debug Runner Environment
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+
+jobs:
+  windows_env_probe:
+    name: Probe Windows Environment
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - name: Show runner image info
+        run: |
+          Write-Host "ImageOS=$env:ImageOS"
+          Write-Host "ImageVersion=$env:ImageVersion"
+
+      - name: Dump all environment variables
+        run: |
+          Get-ChildItem Env: | Sort-Object Name | ForEach-Object { "{0}={1}" -f $_.Name, $_.Value }
+
+      - name: Show vcpkg-related variables and paths
+        run: |
+          $vars = @('VCPKG_INSTALLATION_ROOT','VCPKG_DEFAULT_BINARY_CACHE','VCPKG_DOWNLOADS','LOCALAPPDATA','USERPROFILE','ProgramFiles','Path')
+          foreach ($v in $vars) { Write-Host ("{0}={1}" -f $v, (Get-Item "Env:$v" -ErrorAction SilentlyContinue).Value) }
+          $vcpkgRoot = if ($env:VCPKG_INSTALLATION_ROOT) { $env:VCPKG_INSTALLATION_ROOT } else { 'C:\\vcpkg' }
+          Write-Host "Probing vcpkg root: $vcpkgRoot"
+          if (Test-Path $vcpkgRoot) {
+            Write-Host "vcpkg root exists"
+            if (Test-Path (Join-Path $vcpkgRoot 'downloads')) { Write-Host "downloads exists" } else { Write-Host "downloads missing" }
+            if (Test-Path (Join-Path $vcpkgRoot 'archives')) { Write-Host "archives exists" } else { Write-Host "archives missing" }
+          } else {
+            Write-Host "vcpkg root missing"
+          }
+          if (Get-Command vcpkg -ErrorAction SilentlyContinue) {
+            Write-Host "vcpkg on PATH: $((Get-Command vcpkg).Source)"
+            vcpkg version
+          } else {
+            Write-Host "vcpkg not found on PATH"
+          }
+
+      - name: Check Visual Studio tools
+        run: |
+          $vsDevCmd = 'C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\Common7\\Tools\\VsDevCmd.bat'
+          if (Test-Path $vsDevCmd) { Write-Host "VsDevCmd exists: $vsDevCmd" } else { Write-Host "VsDevCmd missing: $vsDevCmd" }
+          if (Get-Command msbuild -ErrorAction SilentlyContinue) {
+            Write-Host "MSBuild on PATH: $((Get-Command msbuild).Source)"
+            msbuild -version
+          } else {
+            Write-Host "MSBuild not found on PATH"
+          }
