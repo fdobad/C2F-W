@@ -75,6 +75,22 @@ jobs:
           Show-DirSummary "Downloads" $downloads
           Show-DirSummary "Installed" $installed
 
+      - name: Ensure vcpkg registry has required baseline
+        run: |
+          $root = $env:VCPKG_INSTALLATION_ROOT
+          Write-Host "VCPKG_INSTALLATION_ROOT=$root"
+          if (Test-Path (Join-Path $root ".git")) {
+            Write-Host "Fetching vcpkg registry history to ensure baselines are available..."
+            git -C $root fetch --prune --tags --unshallow 2>$null
+            if ($LASTEXITCODE -ne 0) {
+              Write-Host "Unshallow failed or not shallow; fetching with large depth..."
+              git -C $root fetch --prune --tags --depth=100000
+            }
+            git -C $root rev-parse HEAD
+          } else {
+            Write-Host "vcpkg root is not a git repo; skipping registry fetch."
+          }
+
       - name: Build Solution
         run: |
           cd Cell2Fire
