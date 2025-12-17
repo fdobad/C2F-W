@@ -9,6 +9,7 @@
 #include <iostream>
 #include <iterator>
 #include <math.h>
+#include <cstring>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
