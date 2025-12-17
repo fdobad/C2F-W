@@ -56,11 +56,9 @@ jobs:
             ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
             ${{ env.VCPKG_DOWNLOADS }}
             Cell2Fire\vcpkg_installed
-          # Bump prefix to create a fresh multi-path cache snapshot.
           key: vcpkg-all-v1-x64-windows-${{ hashFiles('Cell2Fire/vcpkg.json') }}
           restore-keys: |
             vcpkg-all-v1-x64-windows-
-            # Fallback to older single-path cache, if present
             vcpkg-x64-windows-
 
       - name: Show vcpkg paths (pre-build)
