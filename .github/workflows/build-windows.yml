@@ -4,8 +4,6 @@ on:
   workflow_call:
 permissions:
   contents: write
-env:
-  ACT: ''
 
 jobs:
   windows_build:
@@ -18,7 +16,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v5
 
-      - name: Bump version in header (Windows)
+      - name: Bump version in header
         run: |
           $version = "dev"
           if ( "${{ github.event_name }}" -eq "pull_request" ){
@@ -39,35 +37,16 @@ jobs:
           
           Select-String 'C2FW_VERSION' $path
 
-      - name: Setup vcpkg (manifest mode)
-        run: |
-          New-Item -ItemType Directory -Force -Path "binaries" | Out-Null
-          & build\windows\setup-vcpkg.ps1
-
-      - name: Setup MSBuild (GitHub-hosted)
-        if: env.ACT != 'true'
+      - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
-
-      - name: Download vswhere (local act)
-        if: env.ACT == 'true'
-        run: |
-          New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE\tools\vswhere" | Out-Null
-          $vswherePath = "$env:GITHUB_WORKSPACE\tools\vswhere\vswhere.exe"
-          if (-not (Test-Path $vswherePath)) {
-            Invoke-WebRequest -Uri "https://github.com/microsoft/vswhere/releases/latest/download/vswhere.exe" -OutFile $vswherePath
-          }
-          Write-Host "vswhere located at: $vswherePath"
-
-      - name: Configure MSBuild (local act)
-        if: env.ACT == 'true'
-        uses: microsoft/setup-msbuild@v2
-        with:
-          vswhere-path: tools\vswhere
 
       - name: Build Solution
         run: |
           cd "$env:GITHUB_WORKSPACE\Cell2Fire"
-          msbuild Cell2Fire.sln /p:Configuration=Release /p:VcpkgEnableManifest=true
+          vcpkg integrate install
+          vcpkg install --triplet x64-windows
+          msbuild Cell2Fire.sln /m /t:Clean,Build /p:Configuration=Release /p:Platform=x64 /p:VcpkgEnableManifest=true
+
 
       - name: Run Unit Tests
         run: |

@@ -1,7 +1,6 @@
 {
   "name": "cell2fire",
   "version-string": "dev",
-  "builtin-baseline": "2b6a882f61eaa764ec3cf816e2265fe804a44cd0",
   "dependencies": [
     "boost-random",
     "boost-algorithm",
@@ -11,16 +10,12 @@
   ],
   "overrides": [
     {
-      "name": "boost-random",
-      "version": "1.84.0"
-    },
-    {
-      "name": "boost-algorithm",
-      "version": "1.84.0"
-    },
-    {
       "name": "dirent",
       "version": "1.25"
+    },
+    {
+      "name": "catch2",
+      "version": "2.13.9#1"
     }
   ]
 }
