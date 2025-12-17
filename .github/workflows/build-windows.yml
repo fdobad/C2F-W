@@ -43,6 +43,7 @@ jobs:
       - name: Build Solution
         run: |
           cd Cell2Fire
+          vcpkg install --triplet x64-windows
           msbuild Cell2Fire.sln /m /t:Clean,Build /p:Configuration=Release /p:Platform=x64 /p:VcpkgEnableManifest=true
 
 
