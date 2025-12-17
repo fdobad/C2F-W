@@ -80,13 +80,13 @@ jobs:
           $root = $env:VCPKG_INSTALLATION_ROOT
           Write-Host "VCPKG_INSTALLATION_ROOT=$root"
           if (Test-Path (Join-Path $root ".git")) {
-            Write-Host "Fetching vcpkg registry history to ensure baselines are available..."
-            git -C $root fetch --prune --tags --unshallow 2>$null
-            if ($LASTEXITCODE -ne 0) {
-              Write-Host "Unshallow failed or not shallow; fetching with large depth..."
-              git -C $root fetch --prune --tags --depth=100000
-            }
-            git -C $root rev-parse HEAD
+            Write-Host "Ensuring baseline commit exists in vcpkg registry (assuming complete repo)..."
+            $manifest = Get-Content "$env:GITHUB_WORKSPACE\Cell2Fire\vcpkg.json" | ConvertFrom-Json
+            $baseline = $manifest."builtin-baseline"
+            Write-Host "Pinned baseline=$baseline"
+            git -C $root fetch --prune --tags
+            git -C $root fetch origin $baseline
+            git -C $root show -s --format=%H $baseline
           } else {
             Write-Host "vcpkg root is not a git repo; skipping registry fetch."
           }
