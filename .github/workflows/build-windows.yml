@@ -56,13 +56,11 @@ jobs:
             ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
             ${{ env.VCPKG_DOWNLOADS }}
             Cell2Fire\vcpkg_installed
-          key: vcpkg-all-v1-x64-windows-${{ hashFiles('Cell2Fire/vcpkg.json') }}
-          restore-keys: |
-            vcpkg-all-v1-x64-windows-
-            vcpkg-x64-windows-
+          key: vcpkg-cache-key-${{ hashFiles('Cell2Fire/vcpkg.json') }}
+
 
       - name: Show vcpkg paths (pre-build)
-        if: ${{ true }}
+        if: ${{ false }}
         run: |
           cd Cell2Fire
           $archives = $env:VCPKG_DEFAULT_BINARY_CACHE
@@ -109,7 +107,7 @@ jobs:
           msbuild Cell2Fire.sln /m /t:Clean,Build /p:Configuration=Release /p:Platform=x64 /p:VcpkgEnableManifest=true
 
       - name: Show vcpkg paths (post-build)
-        if: ${{ true }}
+        if: ${{ false }}
         run: |
           cd Cell2Fire
           $archives = $env:VCPKG_DEFAULT_BINARY_CACHE
@@ -135,14 +133,14 @@ jobs:
 
 
       - name: Run Unit Tests
-        if: ${{ false }}
+        if: ${{ true }}
         run: |
           & "Cell2Fire\x64\Release\WindowsTests.exe"
           $exitCode = $LASTEXITCODE
           exit $exitCode
 
       - name: Run Regression Test
-        if: ${{ false }}
+        if: ${{ true }}
         run: |
           cd test
           ./test.ps1
