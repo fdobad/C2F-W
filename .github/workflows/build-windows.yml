@@ -65,9 +65,9 @@ jobs:
           function Show-DirSummary($label, $path) {
             if (Test-Path $path) {
               $count = (Get-ChildItem $path -Recurse -File -ErrorAction SilentlyContinue | Measure-Object).Count
-              Write-Host "$label: exists, files=$count"
+              Write-Host "$label exists, files=$count"
             } else {
-              Write-Host "$label: does not exist"
+              Write-Host "$label does not exist"
             }
           }
 
@@ -95,9 +95,9 @@ jobs:
           function Show-DirSummary($label, $path) {
             if (Test-Path $path) {
               $count = (Get-ChildItem $path -Recurse -File -ErrorAction SilentlyContinue | Measure-Object).Count
-              Write-Host "$label: exists, files=$count"
+              Write-Host "$label exists, files=$count"
             } else {
-              Write-Host "$label: does not exist"
+              Write-Host "$label does not exist"
             }
           }
 
