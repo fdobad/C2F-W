@@ -11,6 +11,10 @@ jobs:
     defaults:
       run:
         shell: powershell
+    env:
+      # Use workspace-local paths for vcpkg caches to improve restore reliability
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}\.github\.environment\vcpkg\archives
+      VCPKG_DOWNLOADS: ${{ github.workspace }}\.github\.environment\vcpkg\downloads
 
     steps:
       - name: Checkout Code
@@ -40,23 +44,31 @@ jobs:
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
+      - name: Prepare vcpkg workspace dirs
+        run: |
+          New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE\.github\.environment\vcpkg\archives" | Out-Null
+          New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE\.github\.environment\vcpkg\downloads" | Out-Null
+
       - name: Cache vcpkg (archives, downloads, installed)
         uses: actions/cache@v4
         with:
           path: |
-            ${{ env.LOCALAPPDATA }}\vcpkg\archives
-            ${{ env.VCPKG_INSTALLATION_ROOT }}\downloads
+            ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+            ${{ env.VCPKG_DOWNLOADS }}
             Cell2Fire\vcpkg_installed
-          key: vcpkg-x64-windows-${{ hashFiles('Cell2Fire/vcpkg.json') }}
+          # Bump prefix to create a fresh multi-path cache snapshot.
+          key: vcpkg-all-v1-x64-windows-${{ hashFiles('Cell2Fire/vcpkg.json') }}
           restore-keys: |
+            vcpkg-all-v1-x64-windows-
+            # Fallback to older single-path cache, if present
             vcpkg-x64-windows-
 
       - name: Show vcpkg paths (pre-build)
         if: ${{ true }}
         run: |
           cd Cell2Fire
-          $archives = Join-Path $env:LOCALAPPDATA "vcpkg\archives"
-          $downloads = Join-Path $env:VCPKG_INSTALLATION_ROOT "downloads"
+          $archives = $env:VCPKG_DEFAULT_BINARY_CACHE
+          $downloads = $env:VCPKG_DOWNLOADS
           $installed = Join-Path $PWD "vcpkg_installed"
 
           Write-Host "Archives path=$archives"
@@ -99,11 +111,11 @@ jobs:
           msbuild Cell2Fire.sln /m /t:Clean,Build /p:Configuration=Release /p:Platform=x64 /p:VcpkgEnableManifest=true
 
       - name: Show vcpkg paths (post-build)
-        if: ${{ false }}
+        if: ${{ true }}
         run: |
           cd Cell2Fire
-          $archives = Join-Path $env:LOCALAPPDATA "vcpkg\archives"
-          $downloads = Join-Path $env:VCPKG_INSTALLATION_ROOT "downloads"
+          $archives = $env:VCPKG_DEFAULT_BINARY_CACHE
+          $downloads = $env:VCPKG_DOWNLOADS
           $installed = Join-Path $PWD "vcpkg_installed"
 
           Write-Host "Archives path=$archives"
