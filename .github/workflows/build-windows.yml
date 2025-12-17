@@ -42,9 +42,7 @@ jobs:
 
       - name: Build Solution
         run: |
-          cd "$env:GITHUB_WORKSPACE\Cell2Fire"
-          vcpkg integrate install
-          vcpkg install --triplet x64-windows
+          cd Cell2Fire
           msbuild Cell2Fire.sln /m /t:Clean,Build /p:Configuration=Release /p:Platform=x64 /p:VcpkgEnableManifest=true
 
 
