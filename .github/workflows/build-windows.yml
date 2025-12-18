@@ -12,9 +12,10 @@ jobs:
       run:
         shell: powershell
     env:
-      # Use workspace-local paths for vcpkg caches to improve restore reliability
       VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}\.github\.environment\vcpkg\archives
       VCPKG_DOWNLOADS: ${{ github.workspace }}\.github\.environment\vcpkg\downloads
+      VCPKG_FEATURE_FLAGS: manifests,binarycaching
+      VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}\\.github\\.environment\\vcpkg\\archives,readwrite"
 
     steps:
       - name: Checkout Code
