@@ -57,7 +57,7 @@ jobs:
             ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
             ${{ env.VCPKG_DOWNLOADS }}
             Cell2Fire\vcpkg_installed
-          key: vcpkg-cache-key-${{ hashFiles('Cell2Fire/vcpkg.json') }}
+          key: vcpkg-${{ vars.CACHE_EPOCH }}-cache-key-${{ hashFiles('Cell2Fire/vcpkg.json') }}
 
 
       - name: Show vcpkg paths (pre-build)
