@@ -104,8 +104,8 @@ jobs:
       - name: Build Solution
         run: |
           cd Cell2Fire
-          vcpkg integrate install --debug
-          msbuild Cell2Fire.sln /m /t:Clean,Build /p:Configuration=Release /p:Platform=x64 /p:VcpkgEnableManifest=true /p:VcpkgAdditionalInstallOptions=--debug
+          vcpkg integrate install
+          msbuild Cell2Fire.sln /m /t:Clean,Build /p:Configuration=Release /p:Platform=x64 /p:VcpkgEnableManifest=true
 
       - name: Show vcpkg paths (post-build)
         if: ${{ false }}
