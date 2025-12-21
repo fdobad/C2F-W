@@ -11,6 +11,8 @@ permissions:
   contents: write
 
 jobs:
+  # vars are set in the repository settings as needed to skip builds
+  # https://github.com/fire2a/C2F-W/settings/variables/actions
   build_debian:
     if: ${{ vars.BUILD_DEBIAN != 'false' }}
     uses: ./.github/workflows/build-debian.yml
@@ -29,6 +31,14 @@ jobs:
 
   create_release:
     needs: [build_debian, build_manylinux, build_macos, build_windows]
+    if: |
+    always() &&
+    (
+      needs.build_debian.result == 'success' ||
+      needs.build_manylinux.result == 'success' ||
+      needs.build_macos.result == 'success' ||
+      needs.build_windows.result == 'success'
+    )
     runs-on: ubuntu-latest
 
     steps:
