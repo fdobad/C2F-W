@@ -11,22 +11,22 @@ permissions:
   contents: write
 
 jobs:
-  # Call all build workflows
   build_debian:
+    if: ${{ vars.BUILD_DEBIAN != 'false' }}
     uses: ./.github/workflows/build-debian.yml
 
   build_manylinux:
+    if: ${{ vars.BUILD_MANYLINUX != 'false' }}
     uses: ./.github/workflows/build-manylinux.yml
 
   build_macos:
+    if: ${{ vars.BUILD_MACOS != 'false' }}
     uses: ./.github/workflows/build-macos.yml
 
   build_windows:
+    if: ${{ vars.BUILD_WINDOWS != 'false' }}
     uses: ./.github/workflows/build-windows.yml
-    with:
-      enabled: true  # Set to false to skip Windows builds
 
-  # Create release with all artifacts
   create_release:
     needs: [build_debian, build_manylinux, build_macos, build_windows]
     runs-on: ubuntu-latest
