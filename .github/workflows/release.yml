@@ -31,8 +31,7 @@ jobs:
 
   create_release:
     needs: [build_debian, build_manylinux, build_macos, build_windows]
-    if: |
-    always() &&
+    if: always() &&
     (
       needs.build_debian.result == 'success' ||
       needs.build_manylinux.result == 'success' ||
