@@ -74,11 +74,6 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v5
 
-      - name: Install Test Dependencies
-        run: |
-          apt-get update
-          apt-get install -y unzip g++ make catch2 libboost-dev libtiff-dev
-
       - name: Download Artifacts
         uses: actions/download-artifact@v6
         with:
@@ -89,6 +84,16 @@ jobs:
         run: |
           chmod +x Cell2Fire/Cell2Fire
 
+      - name: Run Integration Tests with Static Binary
+        run: |
+          cd test
+          bash test.sh
+
+      - name: Install Test Dependencies
+        run: |
+          apt-get update
+          apt-get install -y unzip g++ make catch2 libboost-dev libtiff-dev
+
       - name: Build and Run Unit Tests (Dynamic Build for Testing)
         run: |
           cd Cell2Fire
@@ -96,7 +101,3 @@ jobs:
           make tests
           ./test_cell2fire
 
-      - name: Run Integration Tests with Static Binary
-        run: |
-          cd test
-          bash test.sh
