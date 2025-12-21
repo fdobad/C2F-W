@@ -31,15 +31,8 @@ jobs:
 
   create_release:
     needs: [build_debian, build_manylinux, build_macos, build_windows]
-    if: always() &&
-    (
-      needs.build_debian.result == 'success' ||
-      needs.build_manylinux.result == 'success' ||
-      needs.build_macos.result == 'success' ||
-      needs.build_windows.result == 'success'
-    )
+    if: always() && (needs.build_debian.result == 'success' || needs.build_manylinux.result == 'success' || needs.build_macos.result == 'success' || needs.build_windows.result == 'success')
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout Code
         uses: actions/checkout@v5
