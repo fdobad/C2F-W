@@ -1,21 +1,11 @@
-# Development dependencies
-CXX = g++
+# Makefile for building Cell2Fire on macOS using Homebrew-installed GCC
+HOMEBREW_PREFIX := $(shell brew --prefix)
 
-# NOT WORKING
-# Capture the value of the environment variable HOMEBREW_PREFIX
-# HOMEBREW_PREFIX := $(shell echo $$HOMEBREW_PREFIX)
-# HOMEBREW_PREFIX := $(shell echo $(brew --prefix))
+# get GCC version installed via Homebrew
+GCC_VERSION := $(shell brew list --versions gcc | cut -d' ' -f2 | sort -V | tail -n1 | cut -d. -f1)
+CXX := $(HOMEBREW_PREFIX)/bin/g++-$(GCC_VERSION)
 
-# Capture the output of the `arch` command
-ARCH := $(shell arch)
-
-# Set HOMEBREW_PREFIX based on the architecture
-ifeq ($(ARCH), arm64)
-	HOMEBREW_PREFIX := /opt/homebrew
-else
-	HOMEBREW_PREFIX := /usr/local
-endif
-
+# get include and library paths
 INCLUDE := $(HOMEBREW_PREFIX)/include
 OPT := $(HOMEBREW_PREFIX)/opt
 
@@ -23,8 +13,17 @@ OPT := $(HOMEBREW_PREFIX)/opt
 CXXFLAGS = -m64 -fPIC -fno-strict-aliasing -fexceptions -fopenmp -DNDEBUG -DIL_STD -std=c++14 -O3 -I $(INCLUDE) -I $(INCLUDE)/boost -I $(INCLUDE)/catch2
 LDFLAGS = -m64 -fPIC -fno-strict-aliasing -fexceptions -fopenmp -DNDEBUG -DIL_STD -lm -lpthread -ltiff -L$(OPT)/libtiff/lib
 
+# Get Catch2 Homebrew prefix
+CATCH2_PREFIX := $(shell brew --prefix catch2 2>/dev/null)
+
+# Try to detect if Catch2 v3 libraries are available (Homebrew installs them in lib)
+CATCH2_V3_LIBS := $(shell [ -e "$(CATCH2_PREFIX)/lib/libCatch2Main.dylib" ] || [ -e "$(CATCH2_PREFIX)/lib/libCatch2Main.a" ] && echo "-L$(CATCH2_PREFIX)/lib -lCatch2Main -lCatch2" || echo "")
+
+# Test-specific linker flags
+TEST_LDFLAGS = $(LDFLAGS) $(CATCH2_V3_LIBS)
+
 # Source files
-SRCS = Cell2Fire.cpp Cells.cpp FuelModelUtils.cpp FuelModelSpain.cpp FuelModelKitral.cpp FuelModelFBP.cpp FuelModelPortugal.cpp Spotting.cpp ReadCSV.cpp ReadArgs.cpp Lightning.cpp WriteCSV.cpp DataGenerator.cpp
+SRCS = Cell2Fire.cpp Cells.cpp FuelModelUtils.cpp FuelModelSpain.cpp FuelModelPortugal.cpp FuelModelKitral.cpp FuelModelFBP.cpp Spotting.cpp ReadCSV.cpp ReadArgs.cpp Lightning.cpp WriteCSV.cpp DataGenerator.cpp
 
 # Object files
 OBJS = $(SRCS:.cpp=.o)
@@ -47,13 +46,24 @@ tests: $(TEST_TARGET)
 	./$(TEST_TARGET)
 
 $(TEST_TARGET): $(TEST_FILES) $(SRCS)
-	$(CXX) $(CXXFLAGS) -o $(TEST_TARGET) $(TEST_FILES)
+	$(TEST_CXX) $(filter-out -fopenmp,$(CXXFLAGS)) -o $(TEST_TARGET) $(TEST_FILES) $(filter-out -fopenmp,$(TEST_LDFLAGS))
 
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 clean:
 	rm -f $(OBJS) $(TARGET) $(TEST_TARGET)
+
+# Show build configuration and environment
+info:
+	@echo "Compiler: $(CXX)"
+	@echo "GCC Version: $(GCC_VERSION)"
+	@echo "Homebrew Prefix: $(HOMEBREW_PREFIX)"
+	@echo "INCLUDE: $(INCLUDE)"
+	@echo "OPT: $(OPT)"
+	@echo "CXXFLAGS: $(CXXFLAGS)"
+	@echo "LDFLAGS: $(LDFLAGS)"
+	@echo "Catch2 v3 Libraries: $(if $(CATCH2_V3_LIBS),YES ($(CATCH2_V3_LIBS)),NO (header-only v2))"
 
 DESTDIR = /usr/local/bin
 install: all

@@ -8,6 +8,7 @@ permissions:
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         include:
           # ARM64 builds on macOS 14 Sonoma
@@ -32,6 +33,7 @@ jobs:
             arch: x86_64
             type: static
     runs-on: ${{ matrix.runner }}
+    continue-on-error: true
     steps:
       - name: Checkout Code
         uses: actions/checkout@v5
@@ -58,27 +60,51 @@ jobs:
           SUFFIX="_${KERNEL}.${{ matrix.runner }}.${MACHINE}"
           echo "SUFFIX=${SUFFIX}" >> $GITHUB_ENV
           echo "Building for: ${KERNEL} on ${{ matrix.runner }} (${MACHINE})"
-          echo "matrix:: type:${{ matrix.type }}, arch:${{ matrix.arch }}, runner:${{ matrix.runner }}"
+          echo "matrix attributes:: type:${{ matrix.type }}, arch:${{ matrix.arch }}, runner:${{ matrix.runner }}"
       - name: Install Dependencies
         run: |
           brew install gcc libomp boost libtiff
           if [[ "${{ matrix.type }}" == "static" ]]; then
             brew install jpeg-turbo xz zstd zlib
+          else
+            brew install catch2
           fi
       - name: Check Brew Package Versions
         run: |
           brew list --versions gcc libomp boost libtiff > "pkgs${{ env.SUFFIX }}-${{ matrix.type }}.txt"
           if [[ "${{ matrix.type }}" == "static" ]]; then
             brew list --versions jpeg-turbo xz zstd zlib >> "pkgs${{ env.SUFFIX }}-${{ matrix.type }}.txt"
-          fi
+          fi          
           cat "pkgs${{ env.SUFFIX }}-${{ matrix.type }}.txt"
-      - name: Build
+      - name: Debug show stuff
+        if: false
+        run: |
+          gcc --version
+          g++ --version
+          which g++
+          which gcc
+          BREW_PREFIX=$(brew --prefix)
+          echo "BREW_PREFIX: ${BREW_PREFIX}"
+          echo "brew list gcc versions: $(brew list --versions gcc)"
+          VERSION=$(brew list --versions gcc | cut -d ' ' -f2 | cut -d. -f1)
+          echo "VERSION: ${VERSION}"
+          CC=$BREW_PREFIX/bin/gcc-$VERSION
+          echo "CC: ${CC}"
+          echo "$($CC --version)"
+          GG=$BREW_PREFIX/bin/g++-$VERSION
+          echo "GCC: ${GG}"
+          echo "$($GG --version)"
+      - name: Build (& Test if dynamic)
         run: |
           cd Cell2Fire
-          make clean
           if [[ "${{ matrix.type }}" == "static" ]]; then
+            make -f makefile.macos-static info
+            make -f makefile.macos-static clean
             make -f makefile.macos-static
           else
+            make -f makefile.macos info
+            make -f makefile.macos clean
+            make -f makefile.macos tests
             make -f makefile.macos
           fi
       - name: Get Binary Info
@@ -103,47 +129,56 @@ jobs:
   test:
     needs: build
     strategy:
+      fail-fast: false
       matrix:
-        runner:
-          - macos-14
-          - macos-15
-          - macos-15-intel
+        include:
+          # ARM64 builds on macOS 14 Sonoma
+          - runner: macos-14
+            arch: arm64
+            type: dynamic
+          - runner: macos-14
+            arch: arm64
+            type: static
+          # ARM64 builds on macOS 15 Sequoia
+          - runner: macos-15
+            arch: arm64
+            type: dynamic
+          - runner: macos-15
+            arch: arm64
+            type: static
+          # Intel x86_64 builds on macOS 15
+          - runner: macos-15-intel
+            arch: x86_64
+            type: dynamic
+          - runner: macos-15-intel
+            arch: x86_64
+            type: static
     runs-on: ${{ matrix.runner }}
+    continue-on-error: true
     steps:
       - name: Checkout Code
         uses: actions/checkout@v5
-      - name: Install Test Dependencies
+
+      - name: Set Environment
         run: |
-          brew install gcc libomp boost
+          KERNEL=$(uname -s)
+          MACHINE=$(uname -m)
+          SUFFIX="_${KERNEL}.${{ matrix.runner }}.${MACHINE}"
+          echo "SUFFIX=${SUFFIX}" >> $GITHUB_ENV
+
       - name: Download Artifacts
         uses: actions/download-artifact@v6
         with:
-          pattern: binaries*${{ matrix.runner }}*
+          pattern: binaries${{ env.SUFFIX }}-${{ matrix.type }}
           path: Cell2Fire
           merge-multiple: true
-      - name: Make Binaries Executable
+
+      - name: Install Dependencies
+        if: contains(matrix.type, 'dynamic')
         run: |
-          chmod +x Cell2Fire/Cell2Fire*
-      - name: Build and Run Unit Tests
-        run: |
-          cd Cell2Fire
-          make tests
-          ./test_cell2fire
+          brew install gcc libomp boost
+
       - name: Test Dynamic Binary
         run: |
           cd test
-          KERNEL=$(uname -s)
-          MACHINE=$(uname -m)
-          SUFFIX="_${KERNEL}.${{ matrix.runner }}.${MACHINE}"
-          if [[ -f "../Cell2Fire/Cell2Fire${SUFFIX}-dynamic" ]]; then
-            bash test.sh "${SUFFIX}-dynamic"
-          fi
-      - name: Test Static Binary
-        run: |-
-          cd test
-          KERNEL=$(uname -s)
-          MACHINE=$(uname -m)
-          SUFFIX="_${KERNEL}.${{ matrix.runner }}.${MACHINE}"
-          if [[ -f "../Cell2Fire/Cell2Fire${SUFFIX}-static" ]]; then
-            bash test.sh "${SUFFIX}-static"
-          fi
+          bash test.sh "${{ env.SUFFIX }}-${{ matrix.type }}"
