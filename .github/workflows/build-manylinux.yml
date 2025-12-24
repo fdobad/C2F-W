@@ -5,7 +5,7 @@ on:
   workflow_call:
 
 env:
-  STATIC_BUILD_DEPS: "g++ make libboost-dev libtiff-dev libjpeg-dev libjbig-dev liblzma-dev libzstd-dev libwebp-dev libdeflate-dev libleptonica-dev liblerc-dev"
+  STATIC_BUILD_DEPS: "g++ make libboost-random-dev libtiff-dev libjpeg-dev libjbig-dev liblzma-dev libzstd-dev libwebp-dev libdeflate-dev libleptonica-dev liblerc-dev"
 
 permissions:
   contents: write
@@ -35,13 +35,13 @@ jobs:
 
       - name: Install Build Dependencies
         run: |
-          sudo apt-get update
+          sudo apt-get update -qq
           sudo apt-get install -y ${{ env.STATIC_BUILD_DEPS }}
 
       - name: Build Static Binary
         run: |
           cd Cell2Fire
-          make clean
+          make -f makefile.static clean
           make -f makefile.static
 
       - name: Check Package Versions
@@ -53,7 +53,7 @@ jobs:
       - name: Verify Static Linking
         run: |
           cd Cell2Fire
-          echo "Checking dynamic dependencies (should be minimal):"
+          echo "Checking dynamic dependencies, should output: not a dynamic executable"
           ldd Cell2Fire 2>&1 | tee ldd_manylinux.txt
 
       - name: Upload Static Binary
@@ -66,7 +66,7 @@ jobs:
             Cell2Fire/pkgs_manylinux.txt
           if-no-files-found: error
 
-  test:
+  integration_test:
     needs: build
     runs-on: ubuntu-latest
 
@@ -88,16 +88,3 @@ jobs:
         run: |
           cd test
           bash test.sh
-
-      - name: Install Test Dependencies
-        run: |
-          apt-get update
-          apt-get install -y unzip g++ make catch2 libboost-dev libtiff-dev
-
-      - name: Build and Run Unit Tests (Dynamic Build for Testing)
-        run: |
-          cd Cell2Fire
-          make clean
-          make tests
-          ./test_cell2fire
-

@@ -76,15 +76,10 @@ jobs:
           make clean
           make
 
-      - name: Build Tests
+      - name: Build & Run Unit Tests
         run: |
           cd Cell2Fire
           make tests
-
-      - name: Run Unit Tests
-        run: |
-          cd Cell2Fire
-          ./test_cell2fire
 
       - name: Get Binary Info
         run: |
