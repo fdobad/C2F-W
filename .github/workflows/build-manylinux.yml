@@ -1,4 +1,4 @@
-name: Build ManyLinux (Static)
+name: Build ManyLinux (static lib.linking)
 
 on:
   workflow_dispatch:
@@ -16,7 +16,7 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Bump Version in Code
         shell: bash
@@ -72,7 +72,7 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Download Artifacts
         uses: actions/download-artifact@v6
