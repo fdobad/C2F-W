@@ -1,10 +1,10 @@
 ---
-name: Boost mt19937 cross-OS coordinator
+name: boost::mt19937 rng cross-os congruence
 on:
   workflow_dispatch:
 jobs:
   build-and-run:
-    name: Build and run Boost emitter (${{ matrix.os }})
+    name: Build and run (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -19,20 +19,16 @@ jobs:
       - name: Install dependencies (Ubuntu)
         if: startsWith(matrix.os, 'ubuntu')
         run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential clang
-          # Install Boost.Random only
-          sudo apt-get install -y libboost-random-dev
+          sudo apt-get update -q
+          sudo apt-get install -y build-essential libboost-random-dev
       - name: Install dependencies (macOS)
         if: startsWith(matrix.os, 'macos')
         run: |
           brew update
-          brew install llvm
-          # Homebrew provides Boost as a single formula; we'll use headers/libs from it
-          brew install boost
+          brew install llvm boost
           echo "Using clang++ from Homebrew"
           echo "CXX=$(brew --prefix)/opt/llvm/bin/clang++" >> $GITHUB_ENV
-      - name: Set up Visual Studio shell (Windows)
+      - name: Set up Visual Studio shell
         if: startsWith(matrix.os, 'windows')
         uses: egor-tensin/vs-shell@v2
         with:
@@ -48,11 +44,11 @@ jobs:
       - name: Build (Ubuntu)
         if: startsWith(matrix.os, 'ubuntu')
         run: |
-          c++ -std=c++17 test/tech/mt19937_emit_boost.cpp -o mt19937_emit_boost
+          c++ -std=c++17 test/tech/mt19937_boost.cpp -o mt19937_boost
       - name: Build (macOS)
         if: startsWith(matrix.os, 'macos')
         run: |
-          "$CXX" -std=c++17 -I"$(brew --prefix)/include" -L"$(brew --prefix)/lib" test/tech/mt19937_emit_boost.cpp -o mt19937_emit_boost
+          "$CXX" -std=c++17 -I"$(brew --prefix)/include" -L"$(brew --prefix)/lib" test/tech/mt19937_boost.cpp -o mt19937_boost
       - name: Build (Windows)
         if: startsWith(matrix.os, 'windows')
         shell: powershell
@@ -60,21 +56,21 @@ jobs:
           # Add include path and compile
           $include = Join-Path $env:VCPKG_INSTALLATION_ROOT 'installed\x64-windows\include'
           $env:INCLUDE = "$include;$env:INCLUDE"
-          cmd /c "cl /std:c++17 /EHsc /I `"$include`" test\tech\mt19937_emit_boost.cpp /Fe:mt19937_emit_boost.exe"
+          cmd /c "cl /std:c++17 /EHsc /I `"$include`" test\tech\mt19937_boost.cpp /Fe:mt19937_boost.exe"
       - name: Run emitter
         shell: bash
         run: |
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-            ./mt19937_emit_boost.exe > boost_emit_${{ matrix.os }}.txt
+            ./mt19937_boost.exe > mt19937_${{ runner.os }}.txt
           else
-            ./mt19937_emit_boost > boost_emit_${{ matrix.os }}.txt
+            ./mt19937_boost > mt19937_${{ runner.os }}.txt
           fi
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: boost-emit-${{ matrix.os }}
-          path: boost_emit_${{ matrix.os }}.txt
-  compare-outputs:
+          name: mt19937_${{ runner.os }}
+          path: mt19937_${{ runner.os }}.txt
+  compare:
     name: Compare outputs
     runs-on: ubuntu-latest
     needs: build-and-run
@@ -85,9 +81,9 @@ jobs:
           path: artifacts
       - name: Diff Ubuntu vs macOS
         run: |
-          diff -u artifacts/boost-emit-ubuntu-latest/boost_emit_ubuntu-latest.txt artifacts/boost-emit-macos-latest/boost_emit_macos-latest.txt || (echo "Differences found between Ubuntu and macOS" && exit 1)
+          diff -u artifacts/mt19937_Linux/mt19937_Linux.txt artifacts/mt19937_macOS/mt19937_macOS.txt
       - name: Diff Ubuntu vs Windows (normalize CRLF)
         run: |-
           sudo apt-get install -y dos2unix
-          dos2unix artifacts/boost-emit-windows-latest/boost_emit_windows-latest.txt
-          diff -u artifacts/boost-emit-ubuntu-latest/boost_emit_ubuntu-latest.txt artifacts/boost-emit-windows-latest/boost_emit_windows-latest.txt || (echo "Differences found between Ubuntu and Windows" && exit 1)
+          dos2unix artifacts/mt19937_Windows/mt19937_Windows.txt
+          diff -u  artifacts/mt19937_Windows/mt19937_Windows.txt artifacts/mt19937_Linux/mt19937_Linux.txt
