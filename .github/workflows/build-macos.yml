@@ -1,12 +1,10 @@
+---
 name: Build macOS
-
 on:
   workflow_dispatch:
   workflow_call:
-
 permissions:
   contents: write
-
 jobs:
   build:
     strategy:
@@ -33,16 +31,12 @@ jobs:
           - runner: macos-15-intel
             arch: x86_64
             type: static
-    
     runs-on: ${{ matrix.runner }}
-
     steps:
       - name: Checkout Code
         uses: actions/checkout@v5
-
       - name: Install gsed for version bumping
         run: brew install gsed
-
       - name: Bump Version in Code
         run: |
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
@@ -57,7 +51,6 @@ jobs:
           echo "Setting version to ${version}"
           gsed -i "s/C2FW_VERSION.*/C2FW_VERSION = \"${version}\";/" Cell2Fire/Cell2Fire.h
           grep C2FW_VERSION Cell2Fire/Cell2Fire.h
-
       - name: Set Environment
         run: |
           KERNEL=$(uname -s)
@@ -65,14 +58,13 @@ jobs:
           SUFFIX="_${KERNEL}.${{ matrix.runner }}.${MACHINE}"
           echo "SUFFIX=${SUFFIX}" >> $GITHUB_ENV
           echo "Building for: ${KERNEL} on ${{ matrix.runner }} (${MACHINE})"
-
+          echo "matrix:: type:${{ matrix.type }}, arch:${{ matrix.arch }}, runner:${{ matrix.runner }}"
       - name: Install Dependencies
         run: |
           brew install gcc libomp boost libtiff
           if [[ "${{ matrix.type }}" == "static" ]]; then
             brew install jpeg-turbo xz zstd zlib
           fi
-
       - name: Check Brew Package Versions
         run: |
           brew list --versions gcc libomp boost libtiff > "pkgs${{ env.SUFFIX }}-${{ matrix.type }}.txt"
@@ -80,7 +72,6 @@ jobs:
             brew list --versions jpeg-turbo xz zstd zlib >> "pkgs${{ env.SUFFIX }}-${{ matrix.type }}.txt"
           fi
           cat "pkgs${{ env.SUFFIX }}-${{ matrix.type }}.txt"
-
       - name: Build
         run: |
           cd Cell2Fire
@@ -90,19 +81,16 @@ jobs:
           else
             make -f makefile.macos
           fi
-
       - name: Get Binary Info
         run: |
           cd Cell2Fire
           otool -L Cell2Fire > "otool${{ env.SUFFIX }}-${{ matrix.type }}.txt"
           cat "otool${{ env.SUFFIX }}-${{ matrix.type }}.txt"
-
       - name: Prepare Artifacts
         run: |
           cd Cell2Fire
           mv Cell2Fire "Cell2Fire${{ env.SUFFIX }}-${{ matrix.type }}"
           ls -lh "Cell2Fire${{ env.SUFFIX }}-${{ matrix.type }}"
-
       - name: Upload Artifacts
         uses: actions/upload-artifact@v5
         with:
@@ -112,40 +100,35 @@ jobs:
             Cell2Fire/otool${{ env.SUFFIX }}-${{ matrix.type }}.txt
             pkgs${{ env.SUFFIX }}-${{ matrix.type }}.txt
           if-no-files-found: error
-
   test:
     needs: build
     strategy:
       matrix:
-        runner: [ macos-14, macos-15, macos-15-intel ]
-    
+        runner:
+          - macos-14
+          - macos-15
+          - macos-15-intel
     runs-on: ${{ matrix.runner }}
-
     steps:
       - name: Checkout Code
         uses: actions/checkout@v5
-
       - name: Install Test Dependencies
         run: |
           brew install gcc libomp boost
-
       - name: Download Artifacts
         uses: actions/download-artifact@v6
         with:
           pattern: binaries*${{ matrix.runner }}*
           path: Cell2Fire
           merge-multiple: true
-
       - name: Make Binaries Executable
         run: |
           chmod +x Cell2Fire/Cell2Fire*
-
       - name: Build and Run Unit Tests
         run: |
           cd Cell2Fire
           make tests
           ./test_cell2fire
-
       - name: Test Dynamic Binary
         run: |
           cd test
@@ -155,9 +138,8 @@ jobs:
           if [[ -f "../Cell2Fire/Cell2Fire${SUFFIX}-dynamic" ]]; then
             bash test.sh "${SUFFIX}-dynamic"
           fi
-
       - name: Test Static Binary
-        run: |
+        run: |-
           cd test
           KERNEL=$(uname -s)
           MACHINE=$(uname -m)
