@@ -1,5 +1,5 @@
 ---
-name: boost::mt19937 rng cross-os congruence
+name: mt19937 boost random number generator cross-os congruence
 on:
   workflow_dispatch:
 jobs:

@@ -1,5 +1,5 @@
 ---
-name: std::mt19937 rng cross-os congruence
+name: mt19937 std random number generator cross-os congruence
 on:
   workflow_dispatch:
 jobs:
