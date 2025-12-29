@@ -123,21 +123,21 @@ jobs:
       - name: Get Binary Info
         run: |
           cd Cell2Fire
-          otool -L Cell2Fire > "otool${{ env.SUFFIX }}-${{ matrix.type }}.txt"
-          cat "otool${{ env.SUFFIX }}-${{ matrix.type }}.txt"
+          otool -L Cell2Fire > "otool${{ env.SUFFIX }}.${{ matrix.type }}.txt"
+          cat "otool${{ env.SUFFIX }}.${{ matrix.type }}.txt"
       - name: Prepare Artifacts
         run: |
           cd Cell2Fire
-          mv Cell2Fire "Cell2Fire${{ env.SUFFIX }}-${{ matrix.type }}"
-          ls -lh "Cell2Fire${{ env.SUFFIX }}-${{ matrix.type }}"
+          mv Cell2Fire "Cell2Fire${{ env.SUFFIX }}.${{ matrix.type }}"
+          ls -lh "Cell2Fire${{ env.SUFFIX }}.${{ matrix.type }}"
       - name: Upload Artifacts
         uses: actions/upload-artifact@v5
         with:
           name: binaries${{ env.SUFFIX }}-${{ matrix.type }}
           path: |
-            Cell2Fire/Cell2Fire${{ env.SUFFIX }}-${{ matrix.type }}
-            Cell2Fire/otool${{ env.SUFFIX }}-${{ matrix.type }}.txt
-            Cell2Fire/pkgs${{ env.SUFFIX }}-${{ matrix.type }}.txt
+            Cell2Fire/Cell2Fire${{ env.SUFFIX }}.${{ matrix.type }}
+            Cell2Fire/otool${{ env.SUFFIX }}.${{ matrix.type }}.txt
+            Cell2Fire/pkgs${{ env.SUFFIX }}.${{ matrix.type }}.txt
           if-no-files-found: error
   test:
     needs: build

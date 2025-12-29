@@ -46,14 +46,14 @@ jobs:
 
       - name: Check Package Versions
         run: |
-          cd Cell2Fire
           echo "Checking installed dependencies versions:"
-          dpkg-query -W -f='${binary:Package} ${Version}\n' ${{ env.STATIC_BUILD_DEPS }} | tee pkgs_manylinux.txt
+          cd Cell2Fire
+          dpkg-query -W -f='${binary:Package} ${Version}\n' ${{ env.STATIC_BUILD_DEPS }} 2>&1 | tee pkgs_manylinux.txt
 
       - name: Verify Static Linking
         run: |
-          cd Cell2Fire
           echo "Checking dynamic dependencies, should output: not a dynamic executable"
+          cd Cell2Fire
           ldd Cell2Fire 2>&1 | tee ldd_manylinux.txt
 
       - name: Upload Static Binary
@@ -62,8 +62,8 @@ jobs:
           name: binaries-manylinux-x86_64
           path: |
             Cell2Fire/Cell2Fire
-            Cell2Fire/ldd_manylinux.txt
             Cell2Fire/pkgs_manylinux.txt
+            Cell2Fire/ldd_manylinux.txt
           if-no-files-found: error
 
   integration_test:
