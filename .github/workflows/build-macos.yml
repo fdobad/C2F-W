@@ -1,10 +1,13 @@
 ---
 name: Build macOS (dynamic & static lib.linking)
+
 on:
   workflow_dispatch:
   workflow_call:
+
 permissions:
   contents: write
+
 jobs:
   build:
     strategy:
@@ -35,11 +38,14 @@ jobs:
     runs-on: ${{ matrix.runner }}
     continue-on-error: true
     steps:
-      - name: Checkout Code
+
+      - name: Checkout code
         uses: actions/checkout@v6
+
       - name: Install gsed for version bumping
         run: brew install gsed
-      - name: Bump Version in Code
+
+      - name: Bump version in code
         run: |
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             version="${{ github.sha }}"
@@ -53,15 +59,15 @@ jobs:
           echo "Setting version to ${version}"
           gsed -i "s/C2FW_VERSION.*/C2FW_VERSION = \"${version}\";/" Cell2Fire/Cell2Fire.h
           grep C2FW_VERSION Cell2Fire/Cell2Fire.h
-      - name: Set Environment
+
+      - name: Set suffix
         run: |
-          KERNEL=$(uname -s)
           MACHINE=$(uname -m)
-          SUFFIX="_${KERNEL}.${{ matrix.runner }}.${MACHINE}"
+          SUFFIX="_${{ matrix.runner }}.${MACHINE}.${{ matrix.type }}"
           echo "SUFFIX=${SUFFIX}" >> $GITHUB_ENV
-          echo "Building for: ${KERNEL} on ${{ matrix.runner }} (${MACHINE})"
-          echo "matrix attributes:: type:${{ matrix.type }}, arch:${{ matrix.arch }}, runner:${{ matrix.runner }}"
-      - name: Install Dependencies
+          echo "Building for: ${SUFFIX}"
+
+      - name: Install dependencies
         run: |
           brew install gcc libomp boost libtiff
           if [[ "${{ matrix.type }}" == "static" ]]; then
@@ -69,17 +75,19 @@ jobs:
           else
             brew install catch2
           fi
-      - name: Check Brew Package Versions
+
+      - name: Check brew package versions
         run: |
-          brew list --versions gcc libomp boost libtiff > "Cell2Fire/pkgs${{ env.SUFFIX }}-${{ matrix.type }}.txt"
+          brew list --versions gcc libomp boost libtiff > "Cell2Fire/pkgs${{ env.SUFFIX }}.txt"
           if [[ "${{ matrix.type }}" == "static" ]]; then
-            brew list --versions jpeg-turbo xz zstd zlib >> "Cell2Fire/pkgs${{ env.SUFFIX }}-${{ matrix.type }}.txt"
+            brew list --versions jpeg-turbo xz zstd zlib >> "Cell2Fire/pkgs${{ env.SUFFIX }}.txt"
+          else
+            brew list --versions catch2 >> "Cell2Fire/pkgs${{ env.SUFFIX }}.txt"
           fi
-          cat "Cell2Fire/pkgs${{ env.SUFFIX }}-${{ matrix.type }}.txt"
+          cat "Cell2Fire/pkgs${{ env.SUFFIX }}.txt"
+
       - name: Debug show stuff
         if: true
-        env:
-          MATRIX_TYPE: ${{ matrix.type }}
         run: |
           set -x
           g++ --version
@@ -101,13 +109,13 @@ jobs:
           # ls_brew_pkg boost
           ls_brew_pkg libomp
           ls_brew_pkg libtiff
-          if [[ "$MATRIX_TYPE" == *dynamic* ]]; then 
+          if [[ "${{ matrix.type }}" == "dynamic" ]]; then
             ls $(brew --prefix catch2)
             ls_brew_pkg catch2
             echo "catch2 v: $(brew list --versions catch2 | cut -d' ' -f2 | sort -V | tail -n1 | cut -d. -f1)"
           fi
-          
-      - name: Build (& Test if dynamic)
+
+      - name: Build (& test if dynamic)
         run: |
           cd Cell2Fire
           if [[ "${{ matrix.type }}" == "static" ]]; then
@@ -117,30 +125,37 @@ jobs:
           else
             make -f makefile.macos info
             make -f makefile.macos clean
-            make -f makefile.macos tests
+            if [[ ${{ vars.RUN_UNIT_TESTS }} == 'true' ]]; then
+              make -f makefile.macos tests
+            fi
             make -f makefile.macos
           fi
-      - name: Get Binary Info
+
+      - name: Get binary info
         run: |
           cd Cell2Fire
-          otool -L Cell2Fire > "otool${{ env.SUFFIX }}.${{ matrix.type }}.txt"
-          cat "otool${{ env.SUFFIX }}.${{ matrix.type }}.txt"
-      - name: Prepare Artifacts
+          otool -L Cell2Fire > "otool${{ env.SUFFIX }}.txt"
+          cat "otool${{ env.SUFFIX }}.txt"
+
+      - name: Prepare artifacts
         run: |
           cd Cell2Fire
-          mv Cell2Fire "Cell2Fire${{ env.SUFFIX }}.${{ matrix.type }}"
-          ls -lh "Cell2Fire${{ env.SUFFIX }}.${{ matrix.type }}"
-      - name: Upload Artifacts
+          mv Cell2Fire "Cell2Fire${{ env.SUFFIX }}"
+          ls -lh "Cell2Fire${{ env.SUFFIX }}"
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v5
         with:
-          name: binaries${{ env.SUFFIX }}-${{ matrix.type }}
+          name: binaries${{ env.SUFFIX }}
           path: |
-            Cell2Fire/Cell2Fire${{ env.SUFFIX }}.${{ matrix.type }}
-            Cell2Fire/otool${{ env.SUFFIX }}.${{ matrix.type }}.txt
-            Cell2Fire/pkgs${{ env.SUFFIX }}.${{ matrix.type }}.txt
+            Cell2Fire/Cell2Fire${{ env.SUFFIX }}
+            Cell2Fire/otool${{ env.SUFFIX }}.txt
+            Cell2Fire/pkgs${{ env.SUFFIX }}.txt
           if-no-files-found: error
-  test:
+
+  regression_test:
     needs: build
+    if: ${{ vars.RUN_REGRESSION_TESTS == 'true' }}
     strategy:
       fail-fast: false
       matrix:
@@ -169,29 +184,34 @@ jobs:
     runs-on: ${{ matrix.runner }}
     continue-on-error: true
     steps:
-      - name: Checkout Code
+
+      - name: Checkout only tests
         uses: actions/checkout@v6
+        with:
+          sparse-checkout: |
+            test/
+          sparse-checkout-cone-mode: false
 
-      - name: Set Environment
+      - name: Set suffix
         run: |
-          KERNEL=$(uname -s)
           MACHINE=$(uname -m)
-          SUFFIX="_${KERNEL}.${{ matrix.runner }}.${MACHINE}"
+          SUFFIX="_${{ matrix.runner }}.${MACHINE}.${{ matrix.type }}"
           echo "SUFFIX=${SUFFIX}" >> $GITHUB_ENV
+          echo "Building for: ${SUFFIX}"
 
-      - name: Download Artifacts
+      - name: Download artifacts
         uses: actions/download-artifact@v6
         with:
-          name: binaries${{ env.SUFFIX }}-${{ matrix.type }}
+          name: binaries${{ env.SUFFIX }}
           path: Cell2Fire
 
-      - name: Install Dependencies
+      - name: Install dependencies
         if: contains(matrix.type, 'dynamic')
         run: |
           brew install libomp boost libtiff
 
-      - name: Test Dynamic Binary
-        run: |
-          chmod +x Cell2Fire/Cell2Fire${{ env.SUFFIX }}-${{ matrix.type }}
+      - name: Run tests
+        run: |-
+          chmod +x Cell2Fire/Cell2Fire${{ env.SUFFIX }}
           cd test
-          bash test.sh "${{ env.SUFFIX }}-${{ matrix.type }}"
+          ./test.sh "${{ env.SUFFIX }}"

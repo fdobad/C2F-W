@@ -1,12 +1,15 @@
+---
 name: Build Windows
+
 on:
   workflow_dispatch:
   workflow_call:
+
 permissions:
   contents: write
 
 jobs:
-  windows_build:
+  build:
     runs-on: windows-latest
     defaults:
       run:
@@ -15,9 +18,9 @@ jobs:
       VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}\.github\.environment\vcpkg\archives
       VCPKG_DOWNLOADS: ${{ github.workspace }}\.github\.environment\vcpkg\downloads
       VCPKG_FEATURE_FLAGS: manifests,binarycaching
-      VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}\\.github\\.environment\\vcpkg\\archives,readwrite"
-
+      VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}\.github\.environment\vcpkg\archives,readwrite
     steps:
+
       - name: Checkout Code
         uses: actions/checkout@v6
 
@@ -34,12 +37,9 @@ jobs:
             $ref="${{ github.ref }}"
             $version=$ref.Split("/")[-1]
           }
-          
           Write-Host "Setting version to $version"
-          
           $path = "Cell2Fire\Cell2Fire.h"
           (Get-Content $path) -replace 'C2FW_VERSION\s*=\s*".*?"', "C2FW_VERSION = `"$version`"" | Set-Content $path
-          
           Select-String 'C2FW_VERSION' $path
 
       - name: Setup MSBuild
@@ -59,7 +59,6 @@ jobs:
             Cell2Fire\vcpkg_installed
           key: vcpkg-${{ vars.CACHE_EPOCH }}-cache-key-${{ hashFiles('Cell2Fire/vcpkg.json') }}
 
-
       - name: Show vcpkg paths (pre-build)
         if: ${{ false }}
         run: |
@@ -67,11 +66,9 @@ jobs:
           $archives = $env:VCPKG_DEFAULT_BINARY_CACHE
           $downloads = $env:VCPKG_DOWNLOADS
           $installed = Join-Path $PWD "vcpkg_installed"
-
           Write-Host "Archives path=$archives"
           Write-Host "Downloads path=$downloads"
           Write-Host "Install root (project)=$installed"
-
           function Show-DirSummary($label, $path) {
             if (Test-Path $path) {
               $count = (Get-ChildItem $path -Recurse -File -ErrorAction SilentlyContinue | Measure-Object).Count
@@ -80,7 +77,6 @@ jobs:
               Write-Host "$label does not exist"
             }
           }
-
           Show-DirSummary "Archives" $archives
           Show-DirSummary "Downloads" $downloads
           Show-DirSummary "Installed" $installed
@@ -114,11 +110,9 @@ jobs:
           $archives = $env:VCPKG_DEFAULT_BINARY_CACHE
           $downloads = $env:VCPKG_DOWNLOADS
           $installed = Join-Path $PWD "vcpkg_installed"
-
           Write-Host "Archives path=$archives"
           Write-Host "Downloads path=$downloads"
           Write-Host "Install root (project)=$installed"
-
           function Show-DirSummary($label, $path) {
             if (Test-Path $path) {
               $count = (Get-ChildItem $path -Recurse -File -ErrorAction SilentlyContinue | Measure-Object).Count
@@ -127,24 +121,16 @@ jobs:
               Write-Host "$label does not exist"
             }
           }
-
           Show-DirSummary "Archives" $archives
           Show-DirSummary "Downloads" $downloads
           Show-DirSummary "Installed" $installed
 
-
       - name: Run Unit Tests
-        if: ${{ true }}
+        if: ${{ vars.RUN_UNIT_TESTS == 'true' }}
         run: |
           & "Cell2Fire\x64\Release\WindowsTests.exe"
           $exitCode = $LASTEXITCODE
           exit $exitCode
-
-      - name: Run Regression Test
-        if: ${{ true }}
-        run: |
-          cd test
-          ./test.ps1
 
       - name: Gather output
         run: |
@@ -157,3 +143,27 @@ jobs:
         with:
           name: binaries-Windows-x86_64
           path: binaries
+
+  regression_tests:
+    needs: build
+    if: ${{ vars.RUN_REGRESSION_TESTS == 'true' }}
+    runs-on: windows-latest
+    steps:
+
+      - name: Checkout tests only
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: |
+            test/
+          sparse-checkout-cone-mode: false
+
+      - name: Download Artifacts
+        uses: actions/download-artifact@v6
+        with:
+          name: binaries-Windows-x86_64
+          path: Cell2Fire
+
+      - name: Run Regression Test
+        run: |-
+          cd test
+          ./test.ps1 ../Cell2Fire/Cell2Fire.exe

@@ -1,45 +1,50 @@
+---
 name: Release
 
 on:
   push:
     tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'        # v1.0.0
-      - 'v[0-9]+.[0-9]+.[0-9]+-*'      # v1.0.0-beta
+      - v[0-9]+.[0-9]+.[0-9]+  # v1.0.0
+      - v[0-9]+.[0-9]+.[0-9]+-*  # v1.0.0-beta
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  # vars are set in the repository settings as needed to skip builds
+  # vars are set in the repository settings as needed to skip builds; unit or regression tests
   # https://github.com/fire2a/C2F-W/settings/variables/actions
   build_debian:
-    if: ${{ vars.BUILD_DEBIAN != 'false' }}
+    if: ${{ vars.BUILD_DEBIAN == 'true' }}
     uses: ./.github/workflows/build-debian.yml
 
   build_manylinux:
-    if: ${{ vars.BUILD_MANYLINUX != 'false' }}
+    if: ${{ vars.BUILD_MANYLINUX == 'true' }}
     uses: ./.github/workflows/build-manylinux.yml
 
   build_macos:
-    if: ${{ vars.BUILD_MACOS != 'false' }}
+    if: ${{ vars.BUILD_MACOS == 'true' }}
     uses: ./.github/workflows/build-macos.yml
 
   build_windows:
-    if: ${{ vars.BUILD_WINDOWS != 'false' }}
+    if: ${{ vars.BUILD_WINDOWS == 'true' }}
     uses: ./.github/workflows/build-windows.yml
 
   create_release:
-    needs: [build_debian, build_manylinux, build_macos, build_windows]
+    needs:
+      - build_debian
+      - build_manylinux
+      - build_macos
+      - build_windows
     # if: always() && (needs.build_debian.result == 'success' || needs.build_manylinux.result == 'success' || needs.build_macos.result == 'success' || needs.build_windows.result == 'success')
     if: ${{ !failure() && !cancelled() }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
+
+      - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Set Release Tag
-        id: set_tag
+      - name: Set release tag
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo "RELEASE_TAG=${{ github.sha }}" >> $GITHUB_ENV
@@ -56,21 +61,28 @@ jobs:
             echo "EOF" >> $GITHUB_ENV
           fi
 
-      - name: Get Artifacts
+      - name: Get artifacts
         uses: actions/download-artifact@v6
         with:
           pattern: binaries*
           path: artifacts
 
-      - name: List Artifacts
+      - name: List artifacts
         run: |
           echo "Downloaded artifacts:"
           find artifacts -type f -ls
 
-      - name: Organize Binaries
+      - name: Zipped directory for release
         run: |
+          mkdir zipped
+
+      - name: Move binaries to cell2fire for packaging release
+        run: |
+          if [[ ! -d Cell2Fire ]]; then
+            echo "::error::Cell2Fire directory does not exist, aborting!"
+            exit 1
+          fi
           set +e
-          mkdir -p Cell2Fire
           # linux builds 
           #   Cell2fire.dist.codename.arch
           #   pkgs.dist.codename.arch.txt
@@ -80,54 +92,54 @@ jobs:
           #   pkgs_manylinux.txt
           #   ldd_manylinux.txt
           # macOS build
-          #  Cell2Fire_Darwin.runner.arch.dynamic/static
-          #  pkgs_Darwin.runner.arch.dynamic/static.txt
-          #  otool.runner.arch.dynamic/static.txt
+          #  Cell2Fire_macos-runner.arch.dynamic/static
+          #  pkgs_macos-runner.arch.dynamic/static.txt
+          #  otool_macos-runner.arch.dynamic/static.txt
           find artifacts -name 'Cell2Fire*' -type f -exec cp {} Cell2Fire/ \;
-          find artifacts -name 'pkgs*' -type f -exec cp {} Cell2Fire/ \;
+          find artifacts -name 'pkgs*.txt' -type f -exec cp {} Cell2Fire/ \;
           find artifacts -name 'ldd*.txt' -type f -exec cp {} Cell2Fire/ \;
           find artifacts -name 'otool*.txt' -type f -exec cp {} Cell2Fire/ \;
           # windows build
           #  Cell2Fire.exe
           #  "tiff_dependencies".dll
           find artifacts -name '*.dll' -type f -exec cp {} Cell2Fire/ \;
-          find artifacts -name '*.exe' -type f -exec cp {} Cell2Fire/ \;
+          # find artifacts -name '*.exe' -type f -exec cp {} Cell2Fire/ \;
           set -e
 
-      - name: Create Binary Zips - Debian distros
+      - name: Create binary zips - debian distros
         if: ${{ needs.build_debian.result == 'success' }}
         run: |
           cd Cell2Fire
           # get the names from build-debian.yml
           for distro in "Debian.bookworm.x86_64" "Debian.trixie.x86_64" "Ubuntu.noble.x86_64" "Ubuntu.jammy.x86_64"; do
             if [[ -f "Cell2Fire.${distro}" ]]; then
-              zip ../Cell2FireW_${RELEASE_TAG}-${distro}-binary.zip \
+              zip ../zipped/Cell2FireW_${RELEASE_TAG}-${distro}-binary.zip \
                 "Cell2Fire.${distro}" \
                 "ldd.${distro}.txt" \
                 "pkgs.${distro}.txt" 
             else
-              echo "No build found for ${distro}, skipping."
+              echo "::warning::No Linux ${distro} build found, skipping."
             fi
           done
-          
-      - name: Create Binary Zips - ManyLinux
+
+      - name: Create binary zips - manylinux
         if: ${{ needs.build_manylinux.result == 'success' }}
         run: |
           cd Cell2Fire
           if [[ -f Cell2Fire ]]; then
-            zip ../Cell2FireW_${RELEASE_TAG}-manylinux-x86_64-binary.zip \
+            zip ../zipped/Cell2FireW_${RELEASE_TAG}-manylinux-x86_64-binary.zip \
               Cell2Fire \
               ldd_manylinux.txt \
               pkgs_manylinux.txt
           else
-            echo "No manylinux build found, skipping."
+            echo "::warning::No manylinux build found, skipping."
           fi
 
-      - name: Create Binary Zips - macOS
+      - name: Create binary zips - macos
         if: ${{ needs.build_macos.result == 'success' }}
         run: |
           cd Cell2Fire
-          # get from build-macos.yml
+          # get list from build-macos.yml
           for combo in \
             "macos-14 arm64 dynamic" \
             "macos-14 arm64 static" \
@@ -140,87 +152,58 @@ jobs:
             runner=$1
             arch=$2
             type=$3
-            file="Cell2Fire_Darwin.${runner}.${arch}.${type}"
+            file="Cell2Fire_${runner}.${arch}.${type}"
             if [[ -f "$file" ]]; then
               echo "Found $file"
-              zip ../Cell2FireW_${RELEASE_TAG}-macOS-${runner}-${arch}-${type}-binary.zip \
-                Cell2Fire_Darwin.${runner}.${arch}.${type} \
-                pkgs_Darwin.${runner}.${arch}.${type}.txt \
-                otool_Darwin.${runner}.${arch}.${type}.txt
+              zip ../zipped/Cell2FireW_${RELEASE_TAG}-${runner}-${arch}-${type}-binary.zip \
+                Cell2Fire_${runner}.${arch}.${type} \
+                pkgs_${runner}.${arch}.${type}.txt \
+                otool_${runner}.${arch}.${type}.txt
             else
-              echo "No macOS binaries found, skipping."
+              echo "::warning::No macOS $combo binaries found, skipping."
             fi
           done
 
-      - name: Create Binary Zips - Windows
+      - name: Create binary zips - windows
         if: ${{ needs.build_windows.result == 'success' }}
         run: |
           cd Cell2Fire
           if [[ -f Cell2Fire.exe ]]; then
-            zip ../Cell2FireW_${RELEASE_TAG}-Windows-x86_64-binary.zip \
+            zip ../zipped/Cell2FireW_${RELEASE_TAG}-Windows-x86_64-binary.zip \
               Cell2Fire.exe \
               *.dll
           else
-            echo "No Windows build found, skipping."
+            echo "::warning::No Windows Cell2Fire.exe build found, skipping."
           fi
 
-      - name: Create Data Instance Zips
+      - name: Create data instance zips
         run: |
           cd data
           for format in asc tif; do
-            for fuel_model in CanadianFBP Kitral ScottAndBurgan Portugal; do
+            for fuel_model in CanadianFBP Kitral Portugal ScottAndBurgan; do
               if find $fuel_model/*-$format -maxdepth 0 -quit 1>/dev/null 2>&1; then
                 echo "Zipping $fuel_model $format"
-                zip -r ../$fuel_model-$format.zip $fuel_model/*-$format
+                zip -r ../zipped/$fuel_model-$format.zip $fuel_model/*-$format
               else
-                echo "No files found for $fuel_model $format, skipping."
+                echo "::warning::No files found for $fuel_model $format, skipping."
               fi
             done
           done
 
-      - name: Create Source Archive, excluding instances and heavy documents or images
+      - name: Create source archive, excluding instances and heavy documents or images
         run: |
           git rm -rf data output 2>/dev/null || true
           git rm -f *.pdf 2>/dev/null || true
           git add -f Cell2Fire/* || true
           astash=$(git stash create || echo "HEAD")
-          git archive --prefix=C2F/ --output="Cell2FireW_${RELEASE_TAG}.zip" $astash
+          git archive --prefix=C2F/ --output="zipped/Cell2FireW_${RELEASE_TAG}.zip" $astash
 
-      - name: Build artifact list for release
-        run: |
-          ARTIFACTS="Cell2FireW_${RELEASE_TAG}.zip"
-          for f in \
-            Cell2FireW_${RELEASE_TAG}-Debian.bookworm.x86_64-binary.zip \
-            Cell2FireW_${RELEASE_TAG}-Debian.trixie.x86_64-binary.zip \
-            Cell2FireW_${RELEASE_TAG}-Ubuntu.noble.x86_64-binary.zip \
-            Cell2FireW_${RELEASE_TAG}-manylinux-x86_64-binary.zip \
-            Cell2FireW_${RELEASE_TAG}-macOS-macos-14-arm64-dynamic-binary.zip \
-            Cell2FireW_${RELEASE_TAG}-macOS-macos-14-arm64-static-binary.zip \
-            Cell2FireW_${RELEASE_TAG}-macOS-macos-15-arm64-dynamic-binary.zip \
-            Cell2FireW_${RELEASE_TAG}-macOS-macos-15-arm64-static-binary.zip \
-            Cell2FireW_${RELEASE_TAG}-macOS-macos-15-intel-x86_64-dynamic-binary.zip \
-            Cell2FireW_${RELEASE_TAG}-macOS-macos-15-intel-x86_64-static-binary.zip \
-            Cell2FireW_${RELEASE_TAG}-Windows-x86_64-binary.zip \
-            Kitral-asc.zip \
-            Kitral-tif.zip \
-            CanadianFBP-asc.zip \
-            ScottAndBurgan-asc.zip \
-            ScottAndBurgan-tif.zip \
-            Portugal-asc.zip \
-            Portugal-tif.zip
-          do
-            if [[ -f "$f" ]]; then
-              ARTIFACTS="$ARTIFACTS $f"
-            fi
-          done
-          echo "$ARTIFACTS" > artifact-list.txt
-
-      - name: Create GitHub Release
+      - name: Create github release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: $(cat artifact-list.txt)
+          artifacts: zipped/*
           token: ${{ secrets.GITHUB_TOKEN }}
           draft: true
           tag: ${{ env.RELEASE_TAG }}
-          name: "C2F-W: ${{ env.RELEASE_TAG }}"
+          name: 'C2F-W: ${{ env.RELEASE_TAG }}'
           body: ${{ env.TAG_DESCRIPTION }}
